@@ -34,7 +34,7 @@ export const defaultClientBrand: ClientBrandConfig = {
   industryStandards: "ISSA 540 Workloading • EPA List N Disinfection",
   qualitySla: "4-hour prompt re-clean response at zero added charge if any area is unsatisfactory.",
   paymentTerms: "Invoiced monthly on Net-30 terms. 12-month standard term with 30-day mutual flexibility.",
-  googleAppsScriptUrl: "" // Client provides their own deployed Google Apps Script Webhook
+  googleAppsScriptUrl: "https://script.google.com/macros/s/AKfycbxP_7JM9DiCjbIMurFqbhVjFIgt8egv4OLgEe_FmhCGegoUC2ZF5g4lFYTlH3ew-yCnng/exec"
 };
 
 export const defaultPricingParameters: PricingParameters = {
