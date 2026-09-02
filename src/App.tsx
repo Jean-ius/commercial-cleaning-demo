@@ -66,8 +66,8 @@ export const App: React.FC = () => {
 
   const handleOpenProposalGenerator = (estimate: EstimateResult) => {
     setActiveEstimate(estimate);
+    setToastVisible(false); // Dismiss any active toast immediately when opening proposal
     setCurrentView('proposal');
-    triggerToast(`Generated proposal for ${estimate.squareFootage.toLocaleString()} sq ft facility`);
   };
 
   const handleSelectPackage = (pkgName: string) => {
@@ -82,8 +82,8 @@ export const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
       
-      {/* 1. Supercharged Loom Sales Pitch Mode Toolbar (For Master Pitching) */}
-      {!isProductionPreview && (
+      {/* 1. Supercharged Loom Sales Pitch Mode Toolbar (For Master Pitching - Hidden on Proposal View) */}
+      {!isProductionPreview && currentView !== 'proposal' && (
         <LoomPitchToolbar
           brandConfig={brandConfig}
           onUpdateBrand={handleUpdateBrand}

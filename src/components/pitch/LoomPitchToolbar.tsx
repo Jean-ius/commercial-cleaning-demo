@@ -60,7 +60,7 @@ export const LoomPitchToolbar: React.FC<LoomPitchToolbarProps> = ({
 
   if (isRecordingMode) {
     return (
-      <div className="fixed top-3 right-3 z-50 animate-fade-in">
+      <div className="fixed top-3 right-3 z-50 animate-fade-in print:hidden">
         <button
           onClick={() => setIsRecordingMode(false)}
           className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/90 border border-slate-700 text-xs text-slate-300 hover:text-white backdrop-blur-md shadow-2xl transition-all"
@@ -74,7 +74,7 @@ export const LoomPitchToolbar: React.FC<LoomPitchToolbarProps> = ({
   }
 
   return (
-    <aside aria-label="Loom Pitch Mode Toolbar" className="bg-[#0B132B] border-b border-blue-900/40 text-slate-200 text-xs px-4 py-2.5 shadow-xl sticky top-0 z-40 transition-all">
+    <aside aria-label="Loom Pitch Mode Toolbar" className="bg-[#0B132B] border-b border-blue-900/40 text-slate-200 text-xs px-4 py-2.5 shadow-xl sticky top-0 z-40 transition-all print:hidden">
       <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
         {/* Left Badge & Context */}
         <div className="flex items-center gap-2.5">

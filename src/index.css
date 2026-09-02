@@ -108,7 +108,7 @@
     print-color-adjust: exact !important;
   }
   
-  header, footer, aside, nav, .print\:hidden {
+  header, footer, aside, nav, .print\:hidden, .fixed {
     display: none !important;
   }
 
