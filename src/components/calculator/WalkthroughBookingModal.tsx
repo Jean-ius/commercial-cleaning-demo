@@ -11,9 +11,15 @@ import {
   Phone,
   Mail,
   User,
-  MessageSquare
+  MessageSquare,
+  Sparkles,
+  RotateCcw
 } from 'lucide-react';
-import { EstimateResult, ClientBrandConfig, WalkthroughLead } from '../../types/cleanCommand';
+import { 
+  EstimateResult, 
+  ClientBrandConfig, 
+  WalkthroughBookingRecord 
+} from '../../types/cleanCommand';
 import { facilitySectors, frequencyOptions } from '../../config/clientConfig';
 import { formatCurrency } from '../../utils/pricingEngine';
 
@@ -22,7 +28,7 @@ interface WalkthroughBookingModalProps {
   onClose: () => void;
   estimate: EstimateResult;
   brandConfig: ClientBrandConfig;
-  onLeadSubmitted?: (lead: WalkthroughLead) => void;
+  onBookingSubmitted?: (booking: WalkthroughBookingRecord) => void;
 }
 
 export const WalkthroughBookingModal: React.FC<WalkthroughBookingModalProps> = ({
@@ -30,77 +36,164 @@ export const WalkthroughBookingModal: React.FC<WalkthroughBookingModalProps> = (
   onClose,
   estimate,
   brandConfig,
-  onLeadSubmitted
+  onBookingSubmitted
 }) => {
-  const [step, setStep] = useState<'details' | 'success' | 'error'>('details');
+  const [step, setStep] = useState<'form' | 'success' | 'error'>('form');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [submittedBooking, setSubmittedBooking] = useState<WalkthroughBookingRecord | null>(null);
 
+  // Form State
   const [formData, setFormData] = useState({
-    contactName: '',
+    fullName: '',
     companyName: '',
-    email: '',
-    phone: '',
-    preferredDate: '',
+    businessEmail: '',
+    phoneNumber: '',
+    preferredWalkthroughDate: '',
     preferredTimeWindow: 'Morning (8:00 AM – 12:00 PM)',
-    currentPainPoints: '',
-    termsAgreed: true
+    cleaningFrustrations: ''
   });
+
+  // Validation Error State
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   if (!isOpen) return null;
 
   const sector = facilitySectors.find(s => s.id === estimate.sectorId) || facilitySectors[0];
   const frequency = frequencyOptions.find(f => f.id === estimate.frequencyId) || frequencyOptions[1];
 
+  // Helper to clear specific field error on user input
+  const handleInputChange = (field: keyof typeof formData, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    if (formErrors[field]) {
+      setFormErrors(prev => {
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      });
+    }
+  };
+
+  // Validate form fields
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    if (!formData.fullName.trim() || formData.fullName.trim().length < 2) {
+      errors.fullName = 'Please enter your full name.';
+    }
+
+    if (!formData.companyName.trim() || formData.companyName.trim().length < 2) {
+      errors.companyName = 'Please enter your company or property name.';
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!formData.businessEmail.trim() || !emailRegex.test(formData.businessEmail.trim())) {
+      errors.businessEmail = 'Please enter a valid business work email.';
+    }
+
+    const digitsOnly = formData.phoneNumber.replace(/\D/g, '');
+    if (!formData.phoneNumber.trim() || digitsOnly.length < 7) {
+      errors.phoneNumber = 'Please enter a valid phone number (min 7 digits).';
+    }
+
+    if (!formData.preferredWalkthroughDate) {
+      errors.preferredWalkthroughDate = 'Please select a preferred walkthrough date.';
+    }
+
+    if (!formData.preferredTimeWindow) {
+      errors.preferredTimeWindow = 'Please select a preferred time window.';
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // Generate Unique Booking ID
+  const generateBookingId = (): string => {
+    const year = new Date().getFullYear();
+    const randomNum = Math.floor(1000 + Math.random() * 9000);
+    return `WK-${year}-${randomNum}`;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // 1. Validate all inputs
+    if (!validateForm()) {
+      return;
+    }
+
     setIsSubmitting(true);
     setErrorMessage('');
 
-    const leadPayload: WalkthroughLead = {
-      contactName: formData.contactName,
-      companyName: formData.companyName,
-      email: formData.email,
-      phone: formData.phone,
-      facilityType: sector.name,
-      squareFootage: estimate.squareFootage,
-      frequency: frequency.label,
-      estimatedMonthlyValue: estimate.totalEstimatedMonthlyInvestment,
-      preferredWalkthroughDate: formData.preferredDate || 'Earliest Available',
-      preferredTimeWindow: formData.preferredTimeWindow,
-      currentCleaningPainPoints: formData.currentPainPoints || 'Not specified',
-      submittedAt: new Date().toISOString()
-    };
+    try {
+      const now = new Date();
+      const bookingId = generateBookingId();
 
-    // If client provided a live Google Apps Script endpoint, dispatch HTTPS POST
-    if (brandConfig.googleAppsScriptUrl && brandConfig.googleAppsScriptUrl.startsWith('http')) {
-      try {
-        await fetch(brandConfig.googleAppsScriptUrl, {
-          method: 'POST',
-          mode: 'no-cors', // Google Apps Script handles no-cors redirects cleanly
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(leadPayload)
-        });
+      // 2. Build Structured Booking Record (Estimator snapshot captured at submission time)
+      const bookingRecord: WalkthroughBookingRecord = {
+        bookingId,
+        submissionTimestamp: now.toISOString(),
+        submissionDate: now.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
+        submissionTime: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
         
-        if (onLeadSubmitted) onLeadSubmitted(leadPayload);
-        setStep('success');
-      } catch (err) {
-        console.error('Webhook dispatch error:', err);
-        setErrorMessage('Failed to connect to Google Sheets CRM. Please verify the Webhook URL in client configuration.');
-        setStep('error');
-      } finally {
-        setIsSubmitting(false);
+        // Contact Information
+        fullName: formData.fullName.trim(),
+        companyName: formData.companyName.trim(),
+        businessEmail: formData.businessEmail.trim(),
+        phoneNumber: formData.phoneNumber.trim(),
+        preferredWalkthroughDate: formData.preferredWalkthroughDate,
+        preferredTimeWindow: formData.preferredTimeWindow,
+        cleaningFrustrations: formData.cleaningFrustrations.trim() || 'None specified',
+        
+        // Estimator Context Snapshot at Submission Time
+        facilityType: sector.name,
+        squareFootage: estimate.squareFootage,
+        cleaningFrequency: frequency.label,
+        ballparkEstimateLow: estimate.lowMonthlyRange,
+        ballparkEstimateHigh: estimate.highMonthlyRange,
+        estimatedMonthlyInvestment: estimate.totalEstimatedMonthlyInvestment,
+        ratePerVisit: estimate.pricePerVisit,
+        annualContractValue: estimate.annualContractValue,
+        
+        // Internal Tracking & CRM Fields (Always initial 'NEW')
+        bookingStatus: 'NEW',
+        confirmedDate: '',
+        confirmedTime: '',
+        assignedSalesRep: '',
+        internalNotes: '',
+        lastUpdated: now.toISOString()
+      };
+
+      // 3. Local Workflow Execution (Ready for Google Sheets integration in next step)
+      await new Promise((resolve) => setTimeout(resolve, 600));
+
+      setSubmittedBooking(bookingRecord);
+      if (onBookingSubmitted) {
+        onBookingSubmitted(bookingRecord);
       }
-    } else {
-      // Demo / Local Mode (Endpoint not yet populated)
-      setTimeout(() => {
-        if (onLeadSubmitted) onLeadSubmitted(leadPayload);
-        setIsSubmitting(false);
-        setStep('success');
-      }, 700);
+      setStep('success');
+
+    } catch (err: unknown) {
+      console.error('Booking submission error:', err);
+      setErrorMessage(
+        err instanceof Error ? err.message : 'An unexpected error occurred while processing your request. Please try again.'
+      );
+      setStep('error');
+    } finally {
+      setIsSubmitting(false);
     }
+  };
+
+  // Reset modal state when closing
+  const handleModalClose = () => {
+    onClose();
+    // Delay resetting step so exit animation looks smooth
+    setTimeout(() => {
+      setStep('form');
+      setFormErrors({});
+      setSubmittedBooking(null);
+    }, 200);
   };
 
   return (
@@ -118,23 +211,23 @@ export const WalkthroughBookingModal: React.FC<WalkthroughBookingModalProps> = (
                 Schedule On-Site Facility Walkthrough
               </h3>
               <p className="text-xs text-slate-500">
-                Lock in your ballpark rate &amp; get a formal Scope of Work proposal
+                Request a 15-minute building assessment &amp; verify cleanable square footage
               </p>
             </div>
           </div>
 
           <button
-            onClick={onClose}
+            onClick={handleModalClose}
             className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Estimate Summary Ribbon */}
+        {/* Estimator Context Summary Ribbon (Captured Snapshot) */}
         <div className="px-6 py-3 bg-blue-50/70 border-b border-blue-100 flex flex-wrap items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-blue-600" />
+            <Building2 className="w-4 h-4 text-blue-600 shrink-0" />
             <span className="text-slate-800 font-bold">{sector.name}</span>
             <span className="text-slate-400">•</span>
             <span className="text-slate-600">{estimate.squareFootage.toLocaleString()} sq ft</span>
@@ -150,10 +243,24 @@ export const WalkthroughBookingModal: React.FC<WalkthroughBookingModalProps> = (
           </div>
         </div>
 
-        {/* Body Form */}
-        {step === 'details' && (
-          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        {/* 1. Body Form Step */}
+        {step === 'form' && (
+          <form onSubmit={handleSubmit} noValidate className="p-6 space-y-4">
+            
+            {/* Form Validation Alert Banner if any errors */}
+            {Object.keys(formErrors).length > 0 && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-2.5 text-xs text-rose-700 animate-fade-in">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <div>
+                  <strong className="font-semibold block">Please correct the highlighted fields:</strong>
+                  <span>Ensure all required contact and preferred schedule details are completed.</span>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              
+              {/* Full Name */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Your Full Name <span className="text-rose-500">*</span>
@@ -163,14 +270,20 @@ export const WalkthroughBookingModal: React.FC<WalkthroughBookingModalProps> = (
                   <input
                     type="text"
                     required
-                    value={formData.contactName}
-                    onChange={(e) => setFormData({ ...formData, contactName: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    value={formData.fullName}
+                    onChange={(e) => handleInputChange('fullName', e.target.value)}
+                    className={`w-full bg-slate-50 border rounded-xl pl-9 pr-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:border-transparent transition-all ${
+                      formErrors.fullName ? 'border-rose-400 focus:ring-rose-500 bg-rose-50/30' : 'border-slate-300 focus:ring-blue-500'
+                    }`}
                     placeholder="e.g. David Vance"
                   />
                 </div>
+                {formErrors.fullName && (
+                  <p className="text-[11px] text-rose-600 font-medium mt-1">{formErrors.fullName}</p>
+                )}
               </div>
 
+              {/* Company / Property Name */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Company / Property Name <span className="text-rose-500">*</span>
@@ -181,13 +294,19 @@ export const WalkthroughBookingModal: React.FC<WalkthroughBookingModalProps> = (
                     type="text"
                     required
                     value={formData.companyName}
-                    onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    onChange={(e) => handleInputChange('companyName', e.target.value)}
+                    className={`w-full bg-slate-50 border rounded-xl pl-9 pr-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:border-transparent transition-all ${
+                      formErrors.companyName ? 'border-rose-400 focus:ring-rose-500 bg-rose-50/30' : 'border-slate-300 focus:ring-blue-500'
+                    }`}
                     placeholder="e.g. Apex Innovation Park"
                   />
                 </div>
+                {formErrors.companyName && (
+                  <p className="text-[11px] text-rose-600 font-medium mt-1">{formErrors.companyName}</p>
+                )}
               </div>
 
+              {/* Business Work Email */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Business Work Email <span className="text-rose-500">*</span>
@@ -197,14 +316,20 @@ export const WalkthroughBookingModal: React.FC<WalkthroughBookingModalProps> = (
                   <input
                     type="email"
                     required
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    value={formData.businessEmail}
+                    onChange={(e) => handleInputChange('businessEmail', e.target.value)}
+                    className={`w-full bg-slate-50 border rounded-xl pl-9 pr-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:border-transparent transition-all ${
+                      formErrors.businessEmail ? 'border-rose-400 focus:ring-rose-500 bg-rose-50/30' : 'border-slate-300 focus:ring-blue-500'
+                    }`}
                     placeholder="facility.mgr@company.com"
                   />
                 </div>
+                {formErrors.businessEmail && (
+                  <p className="text-[11px] text-rose-600 font-medium mt-1">{formErrors.businessEmail}</p>
+                )}
               </div>
 
+              {/* Direct Phone Number */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Direct Phone Number <span className="text-rose-500">*</span>
@@ -214,37 +339,50 @@ export const WalkthroughBookingModal: React.FC<WalkthroughBookingModalProps> = (
                   <input
                     type="tel"
                     required
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    value={formData.phoneNumber}
+                    onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
+                    className={`w-full bg-slate-50 border rounded-xl pl-9 pr-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:border-transparent transition-all ${
+                      formErrors.phoneNumber ? 'border-rose-400 focus:ring-rose-500 bg-rose-50/30' : 'border-slate-300 focus:ring-blue-500'
+                    }`}
                     placeholder="(555) 000-0000"
                   />
                 </div>
+                {formErrors.phoneNumber && (
+                  <p className="text-[11px] text-rose-600 font-medium mt-1">{formErrors.phoneNumber}</p>
+                )}
               </div>
 
+              {/* Preferred Walkthrough Date */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Preferred Walkthrough Date
+                  Preferred Walkthrough Date <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
                   <input
                     type="date"
-                    value={formData.preferredDate}
-                    onChange={(e) => setFormData({ ...formData, preferredDate: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    required
+                    value={formData.preferredWalkthroughDate}
+                    onChange={(e) => handleInputChange('preferredWalkthroughDate', e.target.value)}
+                    className={`w-full bg-slate-50 border rounded-xl px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:border-transparent transition-all ${
+                      formErrors.preferredWalkthroughDate ? 'border-rose-400 focus:ring-rose-500 bg-rose-50/30' : 'border-slate-300 focus:ring-blue-500'
+                    }`}
                   />
                 </div>
+                {formErrors.preferredWalkthroughDate && (
+                  <p className="text-[11px] text-rose-600 font-medium mt-1">{formErrors.preferredWalkthroughDate}</p>
+                )}
               </div>
 
+              {/* Preferred Time Window */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Preferred Time Window
+                  Preferred Time Window <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
                   <Clock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                   <select
                     value={formData.preferredTimeWindow}
-                    onChange={(e) => setFormData({ ...formData, preferredTimeWindow: e.target.value })}
+                    onChange={(e) => handleInputChange('preferredTimeWindow', e.target.value)}
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-3 py-2.5 text-sm text-slate-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                   >
                     <option value="Morning (8:00 AM – 12:00 PM)">Morning (8:00 AM – 12:00 PM)</option>
@@ -254,8 +392,10 @@ export const WalkthroughBookingModal: React.FC<WalkthroughBookingModalProps> = (
                   </select>
                 </div>
               </div>
+
             </div>
 
+            {/* Special Instructions / Frustrations */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 Current Cleaning Frustrations / Special Instructions (Optional)
@@ -264,15 +404,15 @@ export const WalkthroughBookingModal: React.FC<WalkthroughBookingModalProps> = (
                 <MessageSquare className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                 <textarea
                   rows={2}
-                  value={formData.currentPainPoints}
-                  onChange={(e) => setFormData({ ...formData, currentPainPoints: e.target.value })}
+                  value={formData.cleaningFrustrations}
+                  onChange={(e) => handleInputChange('cleaningFrustrations', e.target.value)}
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  placeholder="e.g. Current cleaners consistently miss restroom grout and conference room trash cans."
+                  placeholder="e.g. Current cleaners miss restroom deep tile scrubbing and executive conference room glass."
                 />
               </div>
             </div>
 
-            {/* Trust Assurance */}
+            {/* Trust Assurance Notice */}
             <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-start gap-2.5 text-[11px] text-slate-600">
               <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
               <span>
@@ -284,8 +424,9 @@ export const WalkthroughBookingModal: React.FC<WalkthroughBookingModalProps> = (
             <div className="flex items-center justify-end gap-3 pt-2">
               <button
                 type="button"
-                onClick={onClose}
-                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+                onClick={handleModalClose}
+                disabled={isSubmitting}
+                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -293,10 +434,13 @@ export const WalkthroughBookingModal: React.FC<WalkthroughBookingModalProps> = (
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-600/20 disabled:opacity-50 transition-all cursor-pointer"
+                className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-600/20 disabled:opacity-60 transition-all cursor-pointer hover:scale-[1.01] active:scale-[0.99]"
               >
                 {isSubmitting ? (
-                  <span>Logging to Google Sheet...</span>
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                    <span>Processing Walkthrough Request...</span>
+                  </>
                 ) : (
                   <>
                     <span>Confirm Walkthrough Request</span>
@@ -308,36 +452,85 @@ export const WalkthroughBookingModal: React.FC<WalkthroughBookingModalProps> = (
           </form>
         )}
 
-        {/* Success Confirmation View */}
-        {step === 'success' && (
-          <div className="p-8 text-center space-y-4 animate-fade-in">
-            <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
-              <CheckCircle2 className="w-8 h-8" />
+        {/* 2. Professional Confirmation State */}
+        {step === 'success' && submittedBooking && (
+          <div className="p-8 space-y-5 animate-fade-in">
+            <div className="text-center space-y-2">
+              <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-sm">
+                <CheckCircle2 className="w-8 h-8" />
+              </div>
+
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-800 font-mono text-xs font-bold">
+                <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                <span>Reference ID: {submittedBooking.bookingId}</span>
+              </div>
+
+              <h4 className="text-xl font-extrabold text-slate-900 tracking-tight">
+                Walkthrough Request Received
+              </h4>
+
+              <p className="text-xs sm:text-sm text-slate-600 max-w-lg mx-auto leading-relaxed">
+                Thank you, <strong className="text-slate-900 font-bold">{submittedBooking.fullName}</strong>. Your on-site walkthrough request for <strong className="text-slate-900 font-bold">{submittedBooking.companyName}</strong> has been logged.
+              </p>
             </div>
 
-            <h4 className="text-xl font-bold text-slate-900">
-              Walkthrough Request Received!
-            </h4>
+            {/* Booking Snapshot Card */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs space-y-2.5">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                <span className="text-slate-500 font-semibold uppercase text-[10px] tracking-wider">
+                  Requested Schedule
+                </span>
+                <span className="text-slate-900 font-bold">
+                  {submittedBooking.preferredWalkthroughDate} • {submittedBooking.preferredTimeWindow}
+                </span>
+              </div>
 
-            <p className="text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
-              Thank you, <strong className="text-slate-900">{formData.contactName}</strong>. Your estimate of{' '}
-              <strong className="text-blue-700 font-bold">{formatCurrency(estimate.totalEstimatedMonthlyInvestment)}/month</strong> has been logged. Our commercial supervisor for{' '}
-              <span className="text-blue-600 font-semibold">{brandConfig.primaryCity}</span> will contact you at{' '}
-              <strong className="text-slate-900">{formData.phone}</strong> to confirm your walkthrough time.
-            </p>
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                <span className="text-slate-500 font-semibold uppercase text-[10px] tracking-wider">
+                  Facility Context
+                </span>
+                <span className="text-slate-800 font-medium">
+                  {submittedBooking.squareFootage.toLocaleString()} sq ft • {submittedBooking.facilityType} ({submittedBooking.cleaningFrequency})
+                </span>
+              </div>
 
-            <div className="pt-4">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-semibold uppercase text-[10px] tracking-wider">
+                  Ballpark Estimate
+                </span>
+                <span className="text-blue-700 font-mono font-bold">
+                  {formatCurrency(submittedBooking.ballparkEstimateLow)} – {formatCurrency(submittedBooking.ballparkEstimateHigh)} / mo
+                </span>
+              </div>
+            </div>
+
+            {/* Next Steps Notice (Clear expectation: Request under review, will be confirmed) */}
+            <div className="p-3.5 rounded-xl bg-blue-50/80 border border-blue-200 flex items-start gap-2.5 text-xs text-slate-700">
+              <Clock className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+              <div className="space-y-1 text-[11.5px] leading-relaxed">
+                <p>
+                  <strong className="text-blue-950 font-bold">What happens next:</strong> Our operations team for <span className="font-semibold text-slate-900">{brandConfig.primaryCity}</span> is reviewing your requested date and time. A commercial supervisor will contact you at <strong className="text-slate-900 font-bold">{submittedBooking.phoneNumber}</strong> or <strong className="text-slate-900 font-bold">{submittedBooking.businessEmail}</strong> within 1 business day to confirm your on-site walkthrough.
+                </p>
+                <p className="text-slate-500 text-[10.5px]">
+                  * Please note: This is a requested time slot. Your official walkthrough appointment will be confirmed by our team.
+                </p>
+              </div>
+            </div>
+
+            {/* Action */}
+            <div className="pt-2 text-center">
               <button
-                onClick={onClose}
-                className="px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors"
+                type="button"
+                onClick={handleModalClose}
+                className="px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-sm transition-colors cursor-pointer"
               >
-                Back to Estimator
+                Done / Back to Estimator
               </button>
             </div>
           </div>
         )}
 
-        {/* Error View */}
+        {/* 3. Error Handling State (Preserves form data so user can retry) */}
         {step === 'error' && (
           <div className="p-8 text-center space-y-4 animate-fade-in">
             <div className="w-14 h-14 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
@@ -345,23 +538,27 @@ export const WalkthroughBookingModal: React.FC<WalkthroughBookingModalProps> = (
             </div>
 
             <h4 className="text-lg font-bold text-slate-900">
-              Submission Notice
+              Unable to Complete Request
             </h4>
 
             <p className="text-xs text-rose-600 max-w-md mx-auto">
-              {errorMessage}
+              {errorMessage || 'There was a temporary problem processing your walkthrough request.'}
             </p>
 
-            <div className="pt-2 flex justify-center gap-3">
+            <div className="pt-3 flex justify-center gap-3">
               <button
-                onClick={() => setStep('details')}
-                className="px-4 py-2 rounded-xl bg-slate-200 text-slate-800 text-xs font-medium hover:bg-slate-300"
+                type="button"
+                onClick={() => setStep('form')}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-200 text-slate-800 text-xs font-semibold hover:bg-slate-300 transition-colors cursor-pointer"
               >
-                Try Again
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Try Again</span>
               </button>
+              
               <button
-                onClick={onClose}
-                className="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-medium hover:bg-blue-700"
+                type="button"
+                onClick={handleModalClose}
+                className="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 Close
               </button>

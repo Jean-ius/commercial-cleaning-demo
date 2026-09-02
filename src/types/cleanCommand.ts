@@ -102,23 +102,47 @@ export interface ClientBrandConfig {
   insuranceCoverage: string; // e.g. "$2,000,000 Commercial General Liability"
   primaryAccentColor: string; // Hex color for active branding
   foundedYear: string;
-  googleAppsScriptUrl: string; // Client's private Google Apps Script Webhook
+  googleAppsScriptUrl?: string; // Client's Google Apps Script Webhook
 }
 
-export interface WalkthroughLead {
-  contactName: string;
+export type BookingStatus = 'NEW' | 'CONTACTED' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
+
+export interface WalkthroughBookingRecord {
+  bookingId: string;
+  submissionTimestamp: string;
+  submissionDate: string;
+  submissionTime: string;
+  
+  // Contact Information
+  fullName: string;
   companyName: string;
-  email: string;
-  phone: string;
-  facilityType: string;
-  squareFootage: number;
-  frequency: string;
-  estimatedMonthlyValue: number;
+  businessEmail: string;
+  phoneNumber: string;
   preferredWalkthroughDate: string;
   preferredTimeWindow: string;
-  currentCleaningPainPoints: string;
-  submittedAt: string;
+  cleaningFrustrations?: string;
+  
+  // Estimator Snapshot at Submission Time
+  facilityType: string;
+  squareFootage: number;
+  cleaningFrequency: string;
+  ballparkEstimateLow: number;
+  ballparkEstimateHigh: number;
+  estimatedMonthlyInvestment: number;
+  ratePerVisit: number;
+  annualContractValue: number;
+  
+  // Internal Tracking & CRM Fields (Google Sheets Ready)
+  bookingStatus: BookingStatus;
+  confirmedDate: string;
+  confirmedTime: string;
+  assignedSalesRep: string;
+  internalNotes: string;
+  lastUpdated: string;
 }
+
+// Backwards-compatible alias for existing imports
+export type WalkthroughLead = WalkthroughBookingRecord;
 
 export interface ProposalData {
   proposalId: string;
