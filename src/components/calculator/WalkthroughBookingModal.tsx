@@ -22,6 +22,7 @@ import {
 } from '../../types/cleanCommand';
 import { facilitySectors, frequencyOptions } from '../../config/clientConfig';
 import { formatCurrency } from '../../utils/pricingEngine';
+import { submitBookingToGoogleSheets } from '../../services/googleSheetsService';
 
 interface WalkthroughBookingModalProps {
   isOpen: boolean;
@@ -165,8 +166,8 @@ export const WalkthroughBookingModal: React.FC<WalkthroughBookingModalProps> = (
         lastUpdated: now.toISOString()
       };
 
-      // 3. Local Workflow Execution (Ready for Google Sheets integration in next step)
-      await new Promise((resolve) => setTimeout(resolve, 600));
+      // 3. Dispatch to Google Sheets Backend via Google Apps Script Webhook
+      await submitBookingToGoogleSheets(bookingRecord, brandConfig.googleAppsScriptUrl);
 
       setSubmittedBooking(bookingRecord);
       if (onBookingSubmitted) {
