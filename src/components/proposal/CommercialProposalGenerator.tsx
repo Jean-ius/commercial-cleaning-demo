@@ -115,13 +115,13 @@ Guaranteed SLA: ${brandConfig.qualitySla || '4-Hour Prompt Re-Clean Guarantee'}`
       {/* 
         ==================================================================
         EXECUTIVE COMMERCIAL CLEANING SERVICE PROPOSAL
-        1-Page A4 Precision Layout (210mm x 297mm / 794px x 1123px).
-        Strict Visual Parity between Screen Preview, Browser Print & Saved PDF.
+        1-Page A4 Natural Flow Layout (210mm x 297mm / 794px x 1123px).
+        CONTENT → INVESTMENT → COMMITMENTS → SIGNATURES → FOOTER → BOTTOM WHITESPACE.
         ==================================================================
       */}
       <div 
         id="official-proposal-sheet"
-        className="mx-auto bg-white text-slate-900 shadow-2xl rounded-xl border border-slate-200 p-8 sm:p-10 text-xs leading-normal flex flex-col justify-between"
+        className="mx-auto bg-white text-slate-900 shadow-2xl rounded-xl border border-slate-200 p-8 sm:p-10 text-xs leading-normal space-y-4"
         style={{ 
           width: '794px', 
           minHeight: '1123px',
@@ -130,259 +130,257 @@ Guaranteed SLA: ${brandConfig.qualitySla || '4-Hour Prompt Re-Clean Guarantee'}`
         }}
       >
         
-        {/* ================= UPPER & MIDDLE PROPOSAL BODY ================= */}
-        <div className="space-y-4">
-          
-          {/* 1. Header: Elegant Corporate Letterhead */}
-          <div className="flex items-start justify-between border-b-2 border-slate-900 pb-3">
-            {/* Company Info */}
-            <div className="flex items-start gap-3">
-              <div 
-                className="w-11 h-11 rounded-lg text-white flex items-center justify-center font-black text-xl shadow-xs shrink-0 mt-0.5"
-                style={{ backgroundColor: brandConfig.primaryAccentColor || '#2563EB' }}
-              >
-                {brandConfig.companyName.charAt(0)}
-              </div>
-              <div>
-                <h1 className="text-xl font-black text-slate-950 tracking-tight leading-none">
-                  {brandConfig.companyName}
-                </h1>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-600 mt-1">
-                  Commercial Janitorial &amp; Facility Operations
-                </p>
-                <p className="text-[10.5px] text-slate-500 mt-0.5">
-                  {brandConfig.address} • {brandConfig.phone} • {brandConfig.email}
-                </p>
-              </div>
+        {/* 1. Header: Elegant Corporate Letterhead */}
+        <div className="flex items-start justify-between border-b-2 border-slate-900 pb-3.5">
+          {/* Company Info */}
+          <div className="flex items-start gap-3">
+            <div 
+              className="w-11 h-11 rounded-lg text-white flex items-center justify-center font-black text-xl shadow-xs shrink-0 mt-0.5"
+              style={{ backgroundColor: brandConfig.primaryAccentColor || '#2563EB' }}
+            >
+              {brandConfig.companyName.charAt(0)}
             </div>
-
-            {/* Proposal Title & Metadata */}
-            <div className="text-right shrink-0">
-              <span className="text-xs font-black uppercase tracking-wider text-slate-950 block">
-                Commercial Cleaning Proposal
-              </span>
-              <p className="text-[11px] font-mono font-bold text-slate-700 mt-0.5">
-                Ref: {proposalData.proposalId}
+            <div>
+              <h1 className="text-xl font-black text-slate-950 tracking-tight leading-none">
+                {brandConfig.companyName}
+              </h1>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-600 mt-1">
+                Commercial Janitorial &amp; Facility Operations
               </p>
-              <div className="text-[10.5px] text-slate-500 mt-1 space-y-0.5">
-                <p>Issued: <strong className="text-slate-900 font-semibold">{proposalData.createdDate}</strong></p>
-                <p>Valid Through: <strong className="text-slate-900 font-semibold">{proposalData.validUntilDate}</strong></p>
-              </div>
+              <p className="text-[10.5px] text-slate-500 mt-0.5">
+                {brandConfig.address} • {brandConfig.phone} • {brandConfig.email}
+              </p>
             </div>
           </div>
 
-          {/* 2. Prepared For / Facility Overview (Clean Structured Two-Column Layout) */}
-          <div className="grid grid-cols-12 gap-6 border-b border-slate-200 pb-3 text-xs">
-            {/* Left: Client Details */}
-            <div className="col-span-6 space-y-1">
-              <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-400 block">
-                Prepared For
-              </span>
-              {isEditing ? (
-                <div className="space-y-1.5 pr-4">
-                  <input
-                    type="text"
-                    value={proposalData.clientName}
-                    onChange={(e) => setProposalData({ ...proposalData, clientName: e.target.value })}
-                    className="w-full text-xs font-bold p-1 border border-slate-300 rounded bg-white text-slate-950"
-                    placeholder="Contact Name"
-                  />
-                  <input
-                    type="text"
-                    value={proposalData.clientCompany}
-                    onChange={(e) => setProposalData({ ...proposalData, clientCompany: e.target.value })}
-                    className="w-full text-xs font-bold p-1 border border-slate-300 rounded bg-white text-slate-950"
-                    placeholder="Company Name"
-                  />
-                  <input
-                    type="text"
-                    value={proposalData.facilityAddress}
-                    onChange={(e) => setProposalData({ ...proposalData, facilityAddress: e.target.value })}
-                    className="w-full text-xs p-1 border border-slate-300 rounded bg-white text-slate-950"
-                    placeholder="Facility Address"
-                  />
-                </div>
-              ) : (
-                <div>
-                  <h3 className="text-sm font-black text-slate-950 leading-snug">
-                    {proposalData.clientName}
-                  </h3>
-                  <p className="text-xs font-semibold text-slate-700 leading-snug">
-                    {proposalData.clientCompany}
-                  </p>
-                  <p className="text-[11px] text-slate-500 leading-snug mt-0.5">
-                    {proposalData.facilityAddress}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Right: Facility Overview (Primary Specs Dominant, Production Secondary) */}
-            <div className="col-span-6 space-y-1 pl-2 border-l border-slate-100">
-              <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-400 block">
-                Facility Overview
-              </span>
-              <div className="space-y-0.5 text-xs">
-                <p className="text-slate-900 font-bold">
-                  {estimate.squareFootage.toLocaleString()} sq ft <span className="font-normal text-slate-400">•</span> {sector.name}
-                </p>
-                <p className="text-slate-700 font-medium text-[11px]">
-                  Cleaning Schedule: <strong className="text-slate-900 font-semibold">{frequency.label}</strong> ({frequency.sublabel})
-                </p>
-                <p className="text-slate-400 text-[10px] pt-0.5">
-                  Staffing Benchmark: {estimate.hoursPerCleaningVisit} hrs / visit • {estimate.recommendedCrewSize} Dedicated Cleaner{estimate.recommendedCrewSize > 1 ? 's' : ''}
-                </p>
-              </div>
+          {/* Proposal Title & Metadata */}
+          <div className="text-right shrink-0">
+            <span className="text-xs font-black uppercase tracking-wider text-slate-950 block">
+              Commercial Cleaning Proposal
+            </span>
+            <p className="text-[11px] font-mono font-bold text-slate-700 mt-0.5">
+              Ref: {proposalData.proposalId}
+            </p>
+            <div className="text-[10.5px] text-slate-500 mt-1 space-y-0.5">
+              <p>Issued: <strong className="text-slate-900 font-semibold">{proposalData.createdDate}</strong></p>
+              <p>Valid Through: <strong className="text-slate-900 font-semibold">{proposalData.validUntilDate}</strong></p>
             </div>
           </div>
+        </div>
 
-          {/* 3. Scope of Services (Clean Editorial 4-Pillar Layout - Configurable Standards) */}
-          <div className="space-y-2.5">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-1">
-              <h2 className="text-xs font-black uppercase tracking-wider text-slate-950">
-                Scope of Services
-              </h2>
-              {brandConfig.industryStandards ? (
-                <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
-                  {brandConfig.industryStandards}
-                </span>
-              ) : null}
-            </div>
-
-            <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-xs">
-              <div className="space-y-0.5">
-                <h4 className="font-bold text-slate-950 text-xs flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
-                  <span>Restrooms &amp; Common Areas</span>
-                </h4>
-                <p className="text-[11px] text-slate-600 leading-relaxed pl-3">
-                  Daily touchpoint disinfection, fixture sanitization &amp; polishing, consumable restocking, and bacteriological damp mopping.
-                </p>
+        {/* 2. Prepared For / Facility Overview (Clean Structured Two-Column Layout) */}
+        <div className="grid grid-cols-12 gap-6 border-b border-slate-200 pb-3.5 text-xs">
+          {/* Left: Client Details */}
+          <div className="col-span-6 space-y-1">
+            <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-400 block">
+              Prepared For
+            </span>
+            {isEditing ? (
+              <div className="space-y-1.5 pr-4">
+                <input
+                  type="text"
+                  value={proposalData.clientName}
+                  onChange={(e) => setProposalData({ ...proposalData, clientName: e.target.value })}
+                  className="w-full text-xs font-bold p-1 border border-slate-300 rounded bg-white text-slate-950"
+                  placeholder="Contact Name"
+                />
+                <input
+                  type="text"
+                  value={proposalData.clientCompany}
+                  onChange={(e) => setProposalData({ ...proposalData, clientCompany: e.target.value })}
+                  className="w-full text-xs font-bold p-1 border border-slate-300 rounded bg-white text-slate-950"
+                  placeholder="Company Name"
+                />
+                <input
+                  type="text"
+                  value={proposalData.facilityAddress}
+                  onChange={(e) => setProposalData({ ...proposalData, facilityAddress: e.target.value })}
+                  className="w-full text-xs p-1 border border-slate-300 rounded bg-white text-slate-950"
+                  placeholder="Facility Address"
+                />
               </div>
-
-              <div className="space-y-0.5">
-                <h4 className="font-bold text-slate-950 text-xs flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
-                  <span>Offices &amp; Workspaces</span>
-                </h4>
-                <p className="text-[11px] text-slate-600 leading-relaxed pl-3">
-                  Microfiber dusting of workstations, conference room glass detailing, high-touch handle sanitization, and HEPA carpet vacuuming.
+            ) : (
+              <div>
+                <h3 className="text-sm font-black text-slate-950 leading-snug">
+                  {proposalData.clientName}
+                </h3>
+                <p className="text-xs font-semibold text-slate-700 leading-snug">
+                  {proposalData.clientCompany}
                 </p>
-              </div>
-
-              <div className="space-y-0.5">
-                <h4 className="font-bold text-slate-950 text-xs flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
-                  <span>Breakrooms &amp; Kitchens</span>
-                </h4>
-                <p className="text-[11px] text-slate-600 leading-relaxed pl-3">
-                  Countertop sanitation, exterior appliance degreasing, sink deep scrubbing, dining table disinfection, and hard floor mopping.
+                <p className="text-[11px] text-slate-500 leading-snug mt-0.5">
+                  {proposalData.facilityAddress}
                 </p>
-              </div>
-
-              <div className="space-y-0.5">
-                <h4 className="font-bold text-slate-950 text-xs flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
-                  <span>Floor Care &amp; Security Protocol</span>
-                </h4>
-                <p className="text-[11px] text-slate-600 leading-relaxed pl-3">
-                  Corridor auto-scrubbing, entrance mat vacuuming, waste stream diversion, and end-of-shift facility perimeter security arming.
-                </p>
-              </div>
-            </div>
-
-            {/* Periodic Specialty Services (Compact Single Row) */}
-            {estimate.selectedAddOns.length > 0 && (
-              <div className="pt-1.5 pb-1 flex items-center justify-between text-xs border-t border-slate-100">
-                <span className="text-[11px] text-slate-700">
-                  <strong className="text-slate-950 font-bold uppercase text-[10px] tracking-wider mr-1.5">Included Periodic Services:</strong>
-                  {estimate.selectedAddOns.map(id => addOnServices.find(a => a.id === id)?.name).filter(Boolean).join(' • ')}
-                </span>
-                <span className="text-[10px] font-mono font-bold text-emerald-700 uppercase bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 shrink-0">
-                  Included in Monthly Rate
-                </span>
               </div>
             )}
           </div>
 
-          {/* 4. Service Investment (The Visual Centerpiece of the Proposal) */}
-          <div className="space-y-2 border-t border-slate-200 pt-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xs font-black uppercase tracking-wider text-slate-950">
-                Service Investment
-              </h2>
-              <span className="text-[10px] font-semibold text-slate-500 uppercase">
-                Fixed Flat-Rate Commercial Agreement
-              </span>
-            </div>
-
-            {/* Highlight Pricing Banner */}
-            <div className="bg-slate-50 border-y-2 border-slate-900 py-3 px-4 flex items-center justify-between">
-              <div>
-                <span className="text-[10px] uppercase font-black text-slate-500 tracking-wider block">
-                  Monthly Service Investment
-                </span>
-                <p className="text-[11px] text-slate-600 mt-0.5">
-                  All-inclusive: labor, dedicated night supervision, chemicals, dual-motor equipment &amp; insurance.
-                </p>
-              </div>
-
-              <div className="text-right">
-                <span className="text-3xl font-black text-slate-950 font-mono tracking-tight">
-                  {formatCurrency(estimate.totalEstimatedMonthlyInvestment)}
-                </span>
-                <span className="text-xs font-bold text-slate-700"> / month</span>
-              </div>
-            </div>
-
-            {/* Key Metrics Row */}
-            <div className="grid grid-cols-3 gap-4 pt-1 text-center text-xs">
-              <div className="py-1 border-r border-slate-200">
-                <span className="block text-slate-500 text-[10px] uppercase font-bold tracking-wider">Rate Per Visit</span>
-                <strong className="text-slate-950 font-mono text-sm font-black">{formatCurrency(estimate.pricePerVisit)}</strong>
-              </div>
-              <div className="py-1 border-r border-slate-200">
-                <span className="block text-slate-500 text-[10px] uppercase font-bold tracking-wider">Monthly Visits</span>
-                <strong className="text-slate-950 font-mono text-sm font-black">{estimate.cleaningVisitsPerMonth} Visits / mo</strong>
-              </div>
-              <div className="py-1">
-                <span className="block text-slate-500 text-[10px] uppercase font-bold tracking-wider">Annual Contract Value</span>
-                <strong className="text-slate-950 font-mono text-sm font-black">{formatCurrency(estimate.annualContractValue)}</strong>
-              </div>
+          {/* Right: Facility Overview (Primary Specs Dominant, Production Secondary) */}
+          <div className="col-span-6 space-y-1 pl-2 border-l border-slate-100">
+            <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-400 block">
+              Facility Overview
+            </span>
+            <div className="space-y-0.5 text-xs">
+              <p className="text-slate-900 font-bold">
+                {estimate.squareFootage.toLocaleString()} sq ft <span className="font-normal text-slate-400">•</span> {sector.name}
+              </p>
+              <p className="text-slate-700 font-medium text-[11px]">
+                Cleaning Schedule: <strong className="text-slate-900 font-semibold">{frequency.label}</strong> ({frequency.sublabel})
+              </p>
+              <p className="text-slate-400 text-[10px] pt-0.5">
+                Staffing Benchmark: {estimate.hoursPerCleaningVisit} hrs / visit • {estimate.recommendedCrewSize} Dedicated Cleaner{estimate.recommendedCrewSize > 1 ? 's' : ''}
+              </p>
             </div>
           </div>
-
-          {/* 5. Service Commitments (Clean 3-Column Executive Summary) */}
-          <div className="space-y-1.5 border-t border-slate-200 pt-3">
-            <h2 className="text-xs font-black uppercase tracking-wider text-slate-950">
-              Service Commitments
-            </h2>
-            <div className="grid grid-cols-3 gap-4 text-xs text-slate-600">
-              <div className="space-y-0.5">
-                <strong className="text-slate-950 block text-[11px] font-bold">1. Quality SLA Guarantee</strong>
-                <p className="text-[10.5px] text-slate-600 leading-snug">
-                  {brandConfig.qualitySla || '4-hour prompt re-clean response at zero added charge if any area is unsatisfactory.'}
-                </p>
-              </div>
-              <div className="space-y-0.5">
-                <strong className="text-slate-950 block text-[11px] font-bold">2. Insurance &amp; Bonding</strong>
-                <p className="text-[10.5px] text-slate-600 leading-snug">
-                  {brandConfig.insuranceCoverage}. Formal COI issued upon agreement authorization.
-                </p>
-              </div>
-              <div className="space-y-0.5">
-                <strong className="text-slate-950 block text-[11px] font-bold">3. Terms &amp; Invoicing</strong>
-                <p className="text-[10.5px] text-slate-600 leading-snug">
-                  {brandConfig.paymentTerms || 'Invoiced monthly on Net-30 terms. 12-month standard term with 30-day mutual flexibility.'}
-                </p>
-              </div>
-            </div>
-          </div>
-
         </div>
 
-        {/* ================= LOWER SIGNATURE & FOOTER BLOCK ================= */}
-        <div className="pt-4 border-t-2 border-slate-900 text-xs space-y-3" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
+        {/* 3. Scope of Services (Clean Editorial 4-Pillar Layout - Configurable Standards) */}
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between border-b border-slate-200 pb-1">
+            <h2 className="text-xs font-black uppercase tracking-wider text-slate-950">
+              Scope of Services
+            </h2>
+            {brandConfig.industryStandards ? (
+              <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
+                {brandConfig.industryStandards}
+              </span>
+            ) : null}
+          </div>
+
+          <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-xs">
+            <div className="space-y-0.5">
+              <h4 className="font-bold text-slate-950 text-xs flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+                <span>Restrooms &amp; Common Areas</span>
+              </h4>
+              <p className="text-[11px] text-slate-600 leading-relaxed pl-3">
+                Daily touchpoint disinfection, fixture sanitization &amp; polishing, consumable restocking, and bacteriological damp mopping.
+              </p>
+            </div>
+
+            <div className="space-y-0.5">
+              <h4 className="font-bold text-slate-950 text-xs flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+                <span>Offices &amp; Workspaces</span>
+              </h4>
+              <p className="text-[11px] text-slate-600 leading-relaxed pl-3">
+                Microfiber dusting of workstations, conference room glass detailing, high-touch handle sanitization, and HEPA carpet vacuuming.
+              </p>
+            </div>
+
+            <div className="space-y-0.5">
+              <h4 className="font-bold text-slate-950 text-xs flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+                <span>Breakrooms &amp; Kitchens</span>
+              </h4>
+              <p className="text-[11px] text-slate-600 leading-relaxed pl-3">
+                Countertop sanitation, exterior appliance degreasing, sink deep scrubbing, dining table disinfection, and hard floor mopping.
+              </p>
+            </div>
+
+            <div className="space-y-0.5">
+              <h4 className="font-bold text-slate-950 text-xs flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+                <span>Floor Care &amp; Security Protocol</span>
+              </h4>
+              <p className="text-[11px] text-slate-600 leading-relaxed pl-3">
+                Corridor auto-scrubbing, entrance mat vacuuming, waste stream diversion, and end-of-shift facility perimeter security arming.
+              </p>
+            </div>
+          </div>
+
+          {/* Periodic Specialty Services (Compact Single Row) */}
+          {estimate.selectedAddOns.length > 0 && (
+            <div className="pt-1.5 pb-1 flex items-center justify-between text-xs border-t border-slate-100">
+              <span className="text-[11px] text-slate-700">
+                <strong className="text-slate-950 font-bold uppercase text-[10px] tracking-wider mr-1.5">Included Periodic Services:</strong>
+                {estimate.selectedAddOns.map(id => addOnServices.find(a => a.id === id)?.name).filter(Boolean).join(' • ')}
+              </span>
+              <span className="text-[10px] font-mono font-bold text-emerald-700 uppercase bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 shrink-0">
+                Included in Monthly Rate
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* 4. Service Investment (The Visual Centerpiece of the Proposal) */}
+        <div className="space-y-2 border-t border-slate-200 pt-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-black uppercase tracking-wider text-slate-950">
+              Service Investment
+            </h2>
+            <span className="text-[10px] font-semibold text-slate-500 uppercase">
+              Fixed Flat-Rate Commercial Agreement
+            </span>
+          </div>
+
+          {/* Highlight Pricing Banner */}
+          <div className="bg-slate-50 border-y-2 border-slate-900 py-3 px-4 flex items-center justify-between">
+            <div>
+              <span className="text-[10px] uppercase font-black text-slate-500 tracking-wider block">
+                Monthly Service Investment
+              </span>
+              <p className="text-[11px] text-slate-600 mt-0.5">
+                All-inclusive: labor, dedicated night supervision, chemicals, dual-motor equipment &amp; insurance.
+              </p>
+            </div>
+
+            <div className="text-right">
+              <span className="text-3xl font-black text-slate-950 font-mono tracking-tight">
+                {formatCurrency(estimate.totalEstimatedMonthlyInvestment)}
+              </span>
+              <span className="text-xs font-bold text-slate-700"> / month</span>
+            </div>
+          </div>
+
+          {/* Key Metrics Row */}
+          <div className="grid grid-cols-3 gap-4 pt-1 text-center text-xs">
+            <div className="py-1 border-r border-slate-200">
+              <span className="block text-slate-500 text-[10px] uppercase font-bold tracking-wider">Rate Per Visit</span>
+              <strong className="text-slate-950 font-mono text-sm font-black">{formatCurrency(estimate.pricePerVisit)}</strong>
+            </div>
+            <div className="py-1 border-r border-slate-200">
+              <span className="block text-slate-500 text-[10px] uppercase font-bold tracking-wider">Monthly Visits</span>
+              <strong className="text-slate-950 font-mono text-sm font-black">{estimate.cleaningVisitsPerMonth} Visits / mo</strong>
+            </div>
+            <div className="py-1">
+              <span className="block text-slate-500 text-[10px] uppercase font-bold tracking-wider">Annual Contract Value</span>
+              <strong className="text-slate-950 font-mono text-sm font-black">{formatCurrency(estimate.annualContractValue)}</strong>
+            </div>
+          </div>
+        </div>
+
+        {/* 5. Service Commitments (Clean 3-Column Executive Summary) */}
+        <div className="space-y-1.5 border-t border-slate-200 pt-3">
+          <h2 className="text-xs font-black uppercase tracking-wider text-slate-950">
+            Service Commitments
+          </h2>
+          <div className="grid grid-cols-3 gap-4 text-xs text-slate-600">
+            <div className="space-y-0.5">
+              <strong className="text-slate-950 block text-[11px] font-bold">1. Quality SLA Guarantee</strong>
+              <p className="text-[10.5px] text-slate-600 leading-snug">
+                {brandConfig.qualitySla || '4-hour prompt re-clean response at zero added charge if any area is unsatisfactory.'}
+              </p>
+            </div>
+            <div className="space-y-0.5">
+              <strong className="text-slate-950 block text-[11px] font-bold">2. Insurance &amp; Bonding</strong>
+              <p className="text-[10.5px] text-slate-600 leading-snug">
+                {brandConfig.insuranceCoverage}. Formal COI issued upon agreement authorization.
+              </p>
+            </div>
+            <div className="space-y-0.5">
+              <strong className="text-slate-950 block text-[11px] font-bold">3. Terms &amp; Invoicing</strong>
+              <p className="text-[10.5px] text-slate-600 leading-snug">
+                {brandConfig.paymentTerms || 'Invoiced monthly on Net-30 terms. 12-month standard term with 30-day mutual flexibility.'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* 
+          6. Authorization & Acceptance Signature Block
+          Follows Service Commitments immediately and naturally (NO large spacer).
+        */}
+        <div className="pt-3.5 border-t-2 border-slate-900 text-xs" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
           
           <div className="grid grid-cols-2 gap-8">
             
@@ -460,8 +458,8 @@ Guaranteed SLA: ${brandConfig.qualitySla || '4-Hour Prompt Re-Clean Guarantee'}`
 
           </div>
 
-          {/* Subtle Balanced Footer */}
-          <div className="pt-2 text-center text-[10.5px] text-slate-400">
+          {/* Subtle Balanced Footer - Follows signatures immediately */}
+          <div className="mt-3 pt-2 text-center text-[10.5px] text-slate-400">
             {brandConfig.companyName} • License #{brandConfig.licenseNumber} • Serving {brandConfig.primaryCity}
           </div>
 
