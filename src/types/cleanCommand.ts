@@ -102,6 +102,9 @@ export interface ClientBrandConfig {
   insuranceCoverage: string; // e.g. "$2,000,000 Commercial General Liability"
   primaryAccentColor: string; // Hex color for active branding
   foundedYear: string;
+  industryStandards?: string; // Configurable standards e.g. "ISSA 540 Workloading • EPA List N Disinfection"
+  qualitySla?: string;        // Configurable SLA e.g. "4-hour prompt re-clean response at zero added charge if any area is unsatisfactory."
+  paymentTerms?: string;      // Configurable invoicing terms e.g. "Invoiced monthly on Net-30 terms. 12-month standard term with 30-day mutual flexibility."
   googleAppsScriptUrl?: string; // Client's Google Apps Script Webhook
 }
 

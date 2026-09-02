@@ -31,6 +31,9 @@ export const defaultClientBrand: ClientBrandConfig = {
   insuranceCoverage: "$2,000,000 Commercial General Liability & Full Bond",
   primaryAccentColor: "#2563EB", // Royal Corporate Blue
   foundedYear: "2016",
+  industryStandards: "ISSA 540 Workloading • EPA List N Disinfection",
+  qualitySla: "4-hour prompt re-clean response at zero added charge if any area is unsatisfactory.",
+  paymentTerms: "Invoiced monthly on Net-30 terms. 12-month standard term with 30-day mutual flexibility.",
   googleAppsScriptUrl: "" // Client provides their own deployed Google Apps Script Webhook
 };
 
