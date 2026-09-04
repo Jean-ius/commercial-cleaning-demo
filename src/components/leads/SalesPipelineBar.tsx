@@ -1,12 +1,13 @@
 import React from 'react';
 import { LeadRecord, LeadStatus } from '../../types/cleanCommand';
 import { 
-  CheckCircle2, 
   CircleDot, 
+  PhoneCall, 
+  Calculator, 
   FileCheck, 
+  Handshake, 
   Award, 
-  XCircle,
-  Calendar
+  XCircle 
 } from 'lucide-react';
 
 interface SalesPipelineBarProps {
@@ -16,12 +17,13 @@ interface SalesPipelineBarProps {
 }
 
 const PIPELINE_STAGES: { id: LeadStatus; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { id: 'NEW', label: 'New Lead', icon: CircleDot },
-  { id: 'QUALIFIED', label: 'Qualified', icon: CheckCircle2 },
-  { id: 'WALKTHROUGH', label: 'Walkthrough', icon: Calendar },
-  { id: 'PROPOSAL', label: 'Proposal', icon: FileCheck },
-  { id: 'WON', label: 'Won / Contract', icon: Award },
-  { id: 'LOST', label: 'Closed / Lost', icon: XCircle }
+  { id: 'New', label: 'New Lead', icon: CircleDot },
+  { id: 'Contacted', label: 'Contacted', icon: PhoneCall },
+  { id: 'Estimating', label: 'Estimating', icon: Calculator },
+  { id: 'Quoted', label: 'Quoted', icon: FileCheck },
+  { id: 'Negotiation', label: 'Negotiation', icon: Handshake },
+  { id: 'Won', label: 'Closed Won', icon: Award },
+  { id: 'Lost', label: 'Closed Lost', icon: XCircle }
 ];
 
 export const SalesPipelineBar: React.FC<SalesPipelineBarProps> = ({
@@ -51,23 +53,16 @@ export const SalesPipelineBar: React.FC<SalesPipelineBarProps> = ({
         {activeLead && (
           <div className="flex items-center gap-3 text-xs text-slate-600">
             <span>
-              Walkthrough Status:{' '}
-              <span className={`font-bold ${
-                activeLead.walkthroughStatus === 'COMPLETED' ? 'text-emerald-700' :
-                activeLead.walkthroughStatus === 'SCHEDULED' ? 'text-amber-700' : 'text-slate-500'
-              }`}>
-                {activeLead.walkthroughStatus}
+              Current Stage:{' '}
+              <span className="font-bold text-blue-700">
+                {activeLead.status}
               </span>
             </span>
             <span>•</span>
             <span>
-              Proposal Status:{' '}
-              <span className={`font-bold ${
-                activeLead.proposalStatus === 'ACCEPTED' ? 'text-emerald-700' :
-                activeLead.proposalStatus === 'SENT' ? 'text-blue-700' :
-                activeLead.proposalStatus === 'GENERATED' ? 'text-indigo-700' : 'text-slate-500'
-              }`}>
-                {activeLead.proposalStatus}
+              Estimated Value:{' '}
+              <span className="font-bold text-emerald-700 font-mono">
+                ${(activeLead.estimatedValue || activeLead.annualContractValue || 0).toLocaleString()}
               </span>
             </span>
           </div>
@@ -75,7 +70,7 @@ export const SalesPipelineBar: React.FC<SalesPipelineBarProps> = ({
       </div>
 
       {/* Stage Flow Pills */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
         {PIPELINE_STAGES.map((stage) => {
           const Icon = stage.icon;
           const isCurrent = activeLead?.status === stage.id;

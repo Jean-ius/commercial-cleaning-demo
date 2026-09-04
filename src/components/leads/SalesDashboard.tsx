@@ -9,13 +9,17 @@ import {
   Plus, 
   Search, 
   Building2, 
-  Calendar, 
   FileText, 
   Sliders, 
-  User
+  User, 
+  Edit3, 
+  MapPin, 
+  DollarSign, 
+  TrendingUp, 
+  CheckCircle2, 
+  Clock 
 } from 'lucide-react';
 import { formatCurrency } from '../../utils/pricingEngine';
-import { facilitySectors } from '../../config/clientConfig';
 
 interface SalesDashboardProps {
   leads: LeadRecord[];
@@ -23,11 +27,22 @@ interface SalesDashboardProps {
   brandConfig: ClientBrandConfig;
   onSelectLead: (lead: LeadRecord) => void;
   onOpenNewLeadModal: () => void;
-  onOpenWalkthroughModal: (lead: LeadRecord) => void;
+  onOpenEditLeadModal: (lead: LeadRecord) => void;
   onOpenEstimatorForLead: (lead: LeadRecord) => void;
   onOpenProposalForLead: (lead: LeadRecord) => void;
   onUpdateStatus: (leadId: string, newStatus: LeadStatus) => void;
 }
+
+const FILTER_STATUSES: (LeadStatus | 'ALL')[] = [
+  'ALL',
+  'New',
+  'Contacted',
+  'Estimating',
+  'Quoted',
+  'Negotiation',
+  'Won',
+  'Lost'
+];
 
 export const SalesDashboard: React.FC<SalesDashboardProps> = ({
   leads,
@@ -35,7 +50,7 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
   brandConfig,
   onSelectLead,
   onOpenNewLeadModal,
-  onOpenWalkthroughModal,
+  onOpenEditLeadModal,
   onOpenEstimatorForLead,
   onOpenProposalForLead,
   onUpdateStatus
@@ -43,13 +58,20 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
 
-  // Filter leads
+  // Filter leads based on search & status
   const filteredLeads = leads.filter((lead) => {
+    const contact = lead.contactPerson || lead.fullName || '';
+    const company = lead.companyName || '';
+    const id = lead.leadId || '';
+    const location = lead.projectLocation || lead.propertyAddress || '';
+    const project = lead.projectName || '';
+
     const matchesSearch = 
-      lead.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.leadId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.propertyAddress.toLowerCase().includes(searchTerm.toLowerCase());
+      company.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      contact.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      project.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus = filterStatus === 'ALL' || lead.status === filterStatus;
     return matchesSearch && matchesStatus;
@@ -57,51 +79,54 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
 
   const getStatusBadge = (status: LeadStatus) => {
     switch (status) {
-      case 'NEW':
-        return 'bg-blue-50 text-blue-700 border-blue-200';
-      case 'QUALIFIED':
-        return 'bg-indigo-50 text-indigo-700 border-indigo-200';
-      case 'WALKTHROUGH':
-        return 'bg-amber-50 text-amber-700 border-amber-200';
-      case 'PROPOSAL':
-        return 'bg-purple-50 text-purple-700 border-purple-200';
-      case 'WON':
-        return 'bg-emerald-50 text-emerald-700 border-emerald-200 font-bold';
-      case 'LOST':
-        return 'bg-rose-50 text-rose-700 border-rose-200';
+      case 'New':
+        return 'bg-sky-100 text-sky-800 border-sky-200';
+      case 'Contacted':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'Estimating':
+        return 'bg-amber-100 text-amber-800 border-amber-200';
+      case 'Quoted':
+        return 'bg-indigo-100 text-indigo-800 border-indigo-200';
+      case 'Negotiation':
+        return 'bg-purple-100 text-purple-800 border-purple-200';
+      case 'Won':
+        return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+      case 'Lost':
+        return 'bg-rose-100 text-rose-800 border-rose-200';
       default:
-        return 'bg-slate-100 text-slate-700 border-slate-200';
+        return 'bg-slate-100 text-slate-800 border-slate-200';
     }
   };
 
-  const getSectorName = (sectorId: string) => {
-    const s = facilitySectors.find(item => item.id === sectorId);
-    return s ? s.name : sectorId;
-  };
+  // Pipeline metrics
+  const totalPipelineValue = leads.reduce((sum, l) => sum + (l.estimatedValue || l.annualContractValue || 0), 0);
+  const wonCount = leads.filter(l => l.status === 'Won').length;
+  const activeLeadsCount = leads.filter(l => l.status !== 'Won' && l.status !== 'Lost').length;
 
   return (
-    <div className="py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-6">
+    <div className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
       
-      {/* Top Header & Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+      {/* 1. Header with Stats & New Lead Action */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold uppercase tracking-wider mb-2">
-            <Building2 className="w-3.5 h-3.5" />
-            <span>Internal Commercial Sales Hub</span>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-xs font-bold text-blue-700 mb-2">
+            <TrendingUp className="w-3.5 h-3.5" />
+            <span>Sales &amp; Pipeline Management</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-            Sales Opportunities &amp; Estimating CRM
+            Leads &amp; Commercial Pipeline
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Canonical LeadRecord management, instant square-footage bidding, and Google Sheets synchronization across {brandConfig.primaryCity}.
+          <p className="text-sm text-slate-500 mt-1">
+            Centralized prospect records, estimate snapshots, and proposal workflow for {brandConfig.companyName}
           </p>
         </div>
 
+        {/* Primary Action Button */}
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={onOpenNewLeadModal}
-            className="flex items-center gap-2 px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-md shadow-blue-600/20 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+            className="flex items-center gap-2 px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>+ New Lead</span>
@@ -109,7 +134,50 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
         </div>
       </div>
 
-      {/* Pipeline Status Summary Bar */}
+      {/* 2. Pipeline Metric Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Leads</span>
+            <Building2 className="w-4 h-4 text-blue-600" />
+          </div>
+          <p className="text-2xl font-extrabold text-slate-900 mt-2 font-mono">{leads.length}</p>
+          <span className="text-[11px] text-slate-500">{activeLeadsCount} active in pipeline</span>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pipeline Value</span>
+            <DollarSign className="w-4 h-4 text-emerald-600" />
+          </div>
+          <p className="text-2xl font-extrabold text-slate-900 mt-2 font-mono text-emerald-700">
+            {formatCurrency(totalPipelineValue)}
+          </p>
+          <span className="text-[11px] text-slate-500">Estimated contract value</span>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Won Accounts</span>
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+          </div>
+          <p className="text-2xl font-extrabold text-slate-900 mt-2 font-mono text-emerald-700">{wonCount}</p>
+          <span className="text-[11px] text-slate-500">
+            {leads.length > 0 ? Math.round((wonCount / leads.length) * 100) : 0}% win conversion
+          </span>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Database Source</span>
+            <Clock className="w-4 h-4 text-blue-600" />
+          </div>
+          <p className="text-sm font-bold text-slate-900 mt-2 truncate">Google Sheets Sync</p>
+          <span className="text-[11px] text-slate-500">Local cache + Webhook active</span>
+        </div>
+      </div>
+
+      {/* 3. Interactive Sales Pipeline Bar */}
       <SalesPipelineBar
         activeLead={activeLead}
         leads={leads}
@@ -120,7 +188,7 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
         }}
       />
 
-      {/* Active Lead Highlight Banner (if selected) */}
+      {/* 4. Active Lead Highlight Banner (if selected) */}
       {activeLead && (
         <div className="bg-gradient-to-r from-blue-50/90 via-white to-indigo-50/90 border border-blue-200 rounded-2xl p-5 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="space-y-1">
@@ -137,31 +205,31 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
             </div>
 
             <p className="text-xs text-slate-600 flex flex-wrap items-center gap-3 pt-1">
-              <span>Contact: <strong className="text-slate-900">{activeLead.fullName || 'Not specified'}</strong></span>
+              <span>Contact: <strong className="text-slate-900">{activeLead.contactPerson || activeLead.fullName || 'Not specified'}</strong></span>
               <span>•</span>
-              <span>Facility: <strong className="text-slate-900">{getSectorName(activeLead.facilityType)}</strong> ({activeLead.squareFootage.toLocaleString()} sq ft)</span>
+              <span>Project: <strong className="text-slate-900">{activeLead.projectName || activeLead.companyName}</strong></span>
               <span>•</span>
-              <span>Monthly Rate: <strong className="text-emerald-700 font-mono text-sm">{formatCurrency(activeLead.monthlyEstimate)}/mo</strong></span>
+              <span>Value: <strong className="text-emerald-700 font-mono text-sm">{formatCurrency(activeLead.estimatedValue || activeLead.annualContractValue || 0)}</strong></span>
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 shrink-0">
             <button
               type="button"
-              onClick={() => onOpenEstimatorForLead(activeLead)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
+              onClick={() => onOpenEditLeadModal(activeLead)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold transition-all cursor-pointer shadow-sm"
             >
-              <Sliders className="w-3.5 h-3.5" />
-              <span>Adjust Estimate</span>
+              <Edit3 className="w-3.5 h-3.5 text-slate-500" />
+              <span>Edit Lead</span>
             </button>
 
             <button
               type="button"
-              onClick={() => onOpenWalkthroughModal(activeLead)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold transition-all cursor-pointer shadow-sm"
+              onClick={() => onOpenEstimatorForLead(activeLead)}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
             >
-              <Calendar className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Walkthrough ({activeLead.walkthroughStatus})</span>
+              <Sliders className="w-3.5 h-3.5" />
+              <span>Create / Adjust Estimate</span>
             </button>
 
             <button
@@ -176,178 +244,182 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
         </div>
       )}
 
-      {/* Filter & Search Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+      {/* 5. Filters & Search Bar */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        {/* Search */}
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3.5 top-2.5 w-4 h-4 text-slate-400" />
+          <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
           <input
             type="text"
-            placeholder="Search leads by company, contact, ID, address..."
+            placeholder="Search company, contact person, lead ID, location..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white"
+            className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
           />
         </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
-          <span className="text-xs text-slate-500 font-medium whitespace-nowrap">Filter Status:</span>
-          {['ALL', 'NEW', 'QUALIFIED', 'WALKTHROUGH', 'PROPOSAL', 'WON', 'LOST'].map((st) => (
+        {/* Status Filters */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
+          {FILTER_STATUSES.map((status) => (
             <button
-              key={st}
+              key={status}
               type="button"
-              onClick={() => setFilterStatus(st)}
-              className={`px-3 py-1 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
-                filterStatus === st
-                  ? 'bg-blue-600 text-white font-bold shadow-sm'
-                  : 'bg-slate-100 text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+              onClick={() => setFilterStatus(status)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                filterStatus === status
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
               }`}
             >
-              {st}
+              {status}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Leads Table (Executive 15-Column Mirror) */}
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+      {/* 6. Leads Table */}
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-700">
-            <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-              <tr>
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50 text-slate-700 font-bold uppercase tracking-wider text-[11px]">
                 <th className="py-3.5 px-4">Lead ID</th>
-                <th className="py-3.5 px-4">Company &amp; Contact</th>
-                <th className="py-3.5 px-4">Facility &amp; Specs</th>
-                <th className="py-3.5 px-4 text-right">Monthly Est.</th>
-                <th className="py-3.5 px-4 text-center">Walkthrough</th>
-                <th className="py-3.5 px-4 text-center">Proposal</th>
-                <th className="py-3.5 px-4 text-center">Status</th>
+                <th className="py-3.5 px-4">Company &amp; Project</th>
+                <th className="py-3.5 px-4">Contact Person</th>
+                <th className="py-3.5 px-4">Location</th>
+                <th className="py-3.5 px-4 text-right">Estimated Value</th>
+                <th className="py-3.5 px-4">Source</th>
+                <th className="py-3.5 px-4">Status</th>
                 <th className="py-3.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredLeads.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-500">
-                    <p className="text-sm font-medium">No sales leads found.</p>
-                    <p className="text-xs mt-1">Click "+ New Lead" above to initialize your first opportunity.</p>
+                  <td colSpan={8} className="py-12 text-center text-slate-400">
+                    <Building2 className="w-8 h-8 mx-auto text-slate-300 mb-2" />
+                    <p className="text-sm font-medium text-slate-600">No leads match your filter criteria.</p>
+                    <button
+                      type="button"
+                      onClick={onOpenNewLeadModal}
+                      className="mt-3 inline-flex items-center gap-1 text-xs text-blue-600 hover:underline font-semibold"
+                    >
+                      + Create a new lead
+                    </button>
                   </td>
                 </tr>
               ) : (
                 filteredLeads.map((lead) => {
                   const isSelected = activeLead?.leadId === lead.leadId;
+                  const contact = lead.contactPerson || lead.fullName || 'Not specified';
+                  const email = lead.email || lead.businessEmail || '';
+                  const phone = lead.phone || lead.phoneNumber || '';
+                  const location = lead.projectLocation || lead.propertyAddress || 'Not specified';
+                  const value = lead.estimatedValue || lead.annualContractValue || 0;
+
                   return (
                     <tr
                       key={lead.leadId}
                       onClick={() => onSelectLead(lead)}
-                      className={`transition-colors cursor-pointer ${
-                        isSelected 
-                          ? 'bg-blue-50/70 hover:bg-blue-50' 
-                          : 'hover:bg-slate-50/80'
+                      className={`hover:bg-blue-50/40 transition-colors cursor-pointer ${
+                        isSelected ? 'bg-blue-50/70' : ''
                       }`}
                     >
                       {/* Lead ID */}
-                      <td className="py-3.5 px-4 font-mono font-bold text-blue-700 whitespace-nowrap">
-                        {lead.leadId}
-                        <span className="block font-sans text-[10px] font-normal text-slate-400">
-                          {lead.createdDate}
+                      <td className="py-3.5 px-4">
+                        <span className="font-mono text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">
+                          {lead.leadId}
                         </span>
+                        <div className="text-[10px] text-slate-400 mt-1">
+                          {lead.dateCreated || lead.createdDate || 'Recent'}
+                        </div>
                       </td>
 
-                      {/* Company & Contact */}
+                      {/* Company & Project */}
                       <td className="py-3.5 px-4">
-                        <strong className="text-slate-900 font-bold text-sm block">
+                        <div className="font-bold text-slate-900 text-sm">
                           {lead.companyName}
-                        </strong>
-                        <span className="text-slate-500 flex items-center gap-1.5 mt-0.5">
-                          <User className="w-3 h-3 text-slate-400" />
-                          <span>{lead.fullName || 'No contact specified'}</span>
-                          {lead.phoneNumber && (
-                            <span className="text-slate-400">• {lead.phoneNumber}</span>
-                          )}
-                        </span>
+                        </div>
+                        <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                          <span>{lead.projectName || lead.projectType || 'Commercial Scope'}</span>
+                        </div>
                       </td>
 
-                      {/* Facility & Specs */}
+                      {/* Contact Person */}
                       <td className="py-3.5 px-4">
-                        <span className="text-slate-800 font-medium block">
-                          {getSectorName(lead.facilityType)}
-                        </span>
-                        <span className="text-slate-500 text-[11px] font-mono">
-                          {lead.squareFootage.toLocaleString()} sq ft • {lead.cleaningFrequency.replace('_', ' ')}
+                        <div className="font-medium text-slate-800 flex items-center gap-1.5">
+                          <User className="w-3 h-3 text-slate-400" />
+                          <span>{contact}</span>
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-0.5">
+                          {email || phone || 'No direct contact'}
+                        </div>
+                      </td>
+
+                      {/* Location */}
+                      <td className="py-3.5 px-4 max-w-[200px] truncate text-slate-600">
+                        <div className="flex items-center gap-1 truncate">
+                          <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                          <span className="truncate">{location}</span>
+                        </div>
+                      </td>
+
+                      {/* Estimated Value */}
+                      <td className="py-3.5 px-4 text-right font-mono font-bold text-emerald-700">
+                        {formatCurrency(value)}
+                      </td>
+
+                      {/* Source */}
+                      <td className="py-3.5 px-4">
+                        <span className="text-xs text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md font-medium">
+                          {lead.leadSource || 'Website'}
                         </span>
                       </td>
 
-                      {/* Monthly Estimate */}
-                      <td className="py-3.5 px-4 text-right font-mono font-bold text-emerald-700 text-sm tabular-nums whitespace-nowrap">
-                        {lead.monthlyEstimate > 0 ? (
-                          formatCurrency(lead.monthlyEstimate)
-                        ) : (
-                          <span className="text-slate-400 font-sans text-xs">Uncalculated</span>
-                        )}
-                        <span className="block font-sans text-[10px] font-normal text-slate-400">
-                          ACV: {formatCurrency(lead.annualContractValue || lead.monthlyEstimate * 12)}
-                        </span>
+                      {/* Status */}
+                      <td className="py-3.5 px-4">
+                        <select
+                          value={lead.status}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => onUpdateStatus(lead.leadId, e.target.value as LeadStatus)}
+                          className={`text-xs font-bold px-2.5 py-1 rounded-full border cursor-pointer ${getStatusBadge(lead.status)}`}
+                        >
+                          <option value="New">New</option>
+                          <option value="Contacted">Contacted</option>
+                          <option value="Estimating">Estimating</option>
+                          <option value="Quoted">Quoted</option>
+                          <option value="Negotiation">Negotiation</option>
+                          <option value="Won">Won</option>
+                          <option value="Lost">Lost</option>
+                        </select>
                       </td>
 
-                      {/* Walkthrough */}
-                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${
-                          lead.walkthroughStatus === 'COMPLETED'
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : lead.walkthroughStatus === 'SCHEDULED'
-                            ? 'bg-amber-50 text-amber-700 border-amber-200'
-                            : 'bg-slate-100 text-slate-500 border-slate-200'
-                        }`}>
-                          {lead.walkthroughStatus}
-                        </span>
-                      </td>
-
-                      {/* Proposal */}
-                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${
-                          lead.proposalStatus === 'ACCEPTED'
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : lead.proposalStatus === 'GENERATED' || lead.proposalStatus === 'SENT'
-                            ? 'bg-purple-50 text-purple-700 border-purple-200'
-                            : 'bg-slate-100 text-slate-500 border-slate-200'
-                        }`}>
-                          {lead.proposalStatus}
-                        </span>
-                      </td>
-
-                      {/* Pipeline Status */}
-                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                        <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold border ${getStatusBadge(lead.status)}`}>
-                          {lead.status}
-                        </span>
-                      </td>
-
-                      {/* Quick Actions */}
-                      <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                      {/* Actions */}
+                      <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                           <button
                             type="button"
-                            title="Open in Estimator"
-                            onClick={() => onOpenEstimatorForLead(lead)}
-                            className="p-1.5 rounded-lg bg-slate-100 hover:bg-blue-50 border border-slate-200 text-slate-600 hover:text-blue-700 transition-colors cursor-pointer"
+                            title="Edit Lead Record"
+                            onClick={() => onOpenEditLeadModal(lead)}
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
                           >
-                            <Sliders className="w-3.5 h-3.5" />
+                            <Edit3 className="w-4 h-4" />
                           </button>
                           <button
                             type="button"
-                            title="Schedule Walkthrough"
-                            onClick={() => onOpenWalkthroughModal(lead)}
-                            className="p-1.5 rounded-lg bg-slate-100 hover:bg-emerald-50 border border-slate-200 text-slate-600 hover:text-emerald-700 transition-colors cursor-pointer"
+                            title="Create / Adjust Estimate"
+                            onClick={() => onOpenEstimatorForLead(lead)}
+                            className="p-1.5 rounded-lg text-blue-600 hover:text-blue-800 hover:bg-blue-50 transition-colors cursor-pointer"
                           >
-                            <Calendar className="w-3.5 h-3.5" />
+                            <Sliders className="w-4 h-4" />
                           </button>
                           <button
                             type="button"
                             title="Generate Proposal"
                             onClick={() => onOpenProposalForLead(lead)}
-                            className="p-1.5 rounded-lg bg-slate-100 hover:bg-purple-50 border border-slate-200 text-slate-600 hover:text-purple-700 transition-colors cursor-pointer"
+                            className="p-1.5 rounded-lg text-purple-600 hover:text-purple-800 hover:bg-purple-50 transition-colors cursor-pointer"
                           >
-                            <FileText className="w-3.5 h-3.5" />
+                            <FileText className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
@@ -359,7 +431,6 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
           </table>
         </div>
       </div>
-
     </div>
   );
 };

@@ -135,7 +135,7 @@ export const PackagesView: React.FC<PackagesViewProps> = ({ onSelectPackage }) =
               </li>
               <li className="flex items-start gap-2">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                <span>Walkthrough Booking &amp; Qualification Modal</span>
+                <span>Sales Pipeline &amp; New Lead Capture System</span>
               </li>
               <li className="flex items-start gap-2">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
@@ -192,7 +192,7 @@ export const PackagesView: React.FC<PackagesViewProps> = ({ onSelectPackage }) =
               </li>
               <li className="flex items-start gap-2">
                 <CheckCircle2 className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
-                <span>Digital Walkthrough Inspection Scorekeeper</span>
+                <span>Digital Quality Audit Inspection Scorekeeper</span>
               </li>
               <li className="flex items-start gap-2">
                 <CheckCircle2 className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
@@ -333,7 +333,7 @@ export const PackagesView: React.FC<PackagesViewProps> = ({ onSelectPackage }) =
               </div>
             </div>
 
-            <div className="p-6 overflow-y-auto font-mono text-xs text-slate-200 bg-slate-900">
+            <div className="p-6 overflow-y-auto font-mono text-xs text-slate-800 bg-slate-900 text-slate-200">
               <pre className="whitespace-pre-wrap">{googleAppsScriptTemplate}</pre>
             </div>
           </div>

@@ -77,7 +77,7 @@ export function calculateCommercialEstimate(
   const totalEstimatedMonthlyInvestment = baseMonthlyRate + addOnMonthlyTotal;
   const annualContractValue = totalEstimatedMonthlyInvestment * 12;
   
-  // 7. Ballpark Range (+/- 7% variance for walkthrough contingency)
+  // 7. Ballpark Range (+/- 7% variance for site contingency)
   const lowMonthlyRange = Math.round(totalEstimatedMonthlyInvestment * 0.93);
   const highMonthlyRange = Math.round(totalEstimatedMonthlyInvestment * 1.07);
   

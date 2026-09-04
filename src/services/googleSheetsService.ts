@@ -1,4 +1,4 @@
-import { LeadRecord, LeadStatus, WalkthroughBookingRecord } from '../types/cleanCommand';
+import { LeadRecord, LeadStatus } from '../types/cleanCommand';
 
 const LOCAL_STORAGE_LEADS_KEY = 'cleancommand_leads_cache';
 
@@ -53,7 +53,7 @@ async function postToWebhook(action: string, data: unknown, webhookUrl?: string)
 export async function loadLeadsFromGoogleSheets(webhookUrl?: string): Promise<{ leads: LeadRecord[]; mode: 'live' | 'local_fallback' }> {
   const targetUrl = resolveWebhookUrl(webhookUrl);
 
-  // Try local cache first for initial fast render
+  // Read local cache first for instant client-side render
   const cachedRaw = localStorage.getItem(LOCAL_STORAGE_LEADS_KEY);
   let localLeads: LeadRecord[] = [];
   if (cachedRaw) {
@@ -82,7 +82,6 @@ export async function loadLeadsFromGoogleSheets(webhookUrl?: string): Promise<{ 
     if (response.ok) {
       const data = await response.json();
       if (data && data.success && Array.isArray(data.leads)) {
-        // Merge or replace cache
         localStorage.setItem(LOCAL_STORAGE_LEADS_KEY, JSON.stringify(data.leads));
         return { leads: data.leads, mode: 'live' };
       }
@@ -129,6 +128,30 @@ export async function createLeadInGoogleSheets(
 }
 
 /**
+ * Update complete lead information in Google Sheets in-place
+ */
+export async function updateLeadInGoogleSheets(
+  lead: LeadRecord,
+  webhookUrl?: string
+): Promise<{ success: boolean }> {
+  try {
+    const cached = JSON.parse(localStorage.getItem(LOCAL_STORAGE_LEADS_KEY) || '[]');
+    const idx = cached.findIndex((l: LeadRecord) => l.leadId === lead.leadId);
+    if (idx !== -1) {
+      cached[idx] = { ...cached[idx], ...lead, updatedDate: new Date().toISOString().split('T')[0] };
+    } else {
+      cached.unshift(lead);
+    }
+    localStorage.setItem(LOCAL_STORAGE_LEADS_KEY, JSON.stringify(cached));
+  } catch (e) {
+    console.warn('[GoogleSheetsService] Cache update error', e);
+  }
+
+  const res = await postToWebhook('update_lead', lead, webhookUrl);
+  return { success: res.success !== false };
+}
+
+/**
  * Save an updated estimate snapshot to the active lead record in Google Sheets
  */
 export async function saveEstimateToGoogleSheets(
@@ -136,12 +159,16 @@ export async function saveEstimateToGoogleSheets(
   estimateData: Partial<LeadRecord>,
   webhookUrl?: string
 ): Promise<{ success: boolean }> {
-  // Sync to local cache
   try {
     const cached = JSON.parse(localStorage.getItem(LOCAL_STORAGE_LEADS_KEY) || '[]');
     const idx = cached.findIndex((l: LeadRecord) => l.leadId === leadId);
     if (idx !== -1) {
-      cached[idx] = { ...cached[idx], ...estimateData, lastUpdated: new Date().toISOString() };
+      cached[idx] = { 
+        ...cached[idx], 
+        ...estimateData, 
+        status: cached[idx].status === 'New' ? 'Estimating' : cached[idx].status,
+        updatedDate: new Date().toISOString().split('T')[0] 
+      };
       localStorage.setItem(LOCAL_STORAGE_LEADS_KEY, JSON.stringify(cached));
     }
   } catch (e) {
@@ -149,52 +176,6 @@ export async function saveEstimateToGoogleSheets(
   }
 
   const res = await postToWebhook('save_estimate', { leadId, ...estimateData }, webhookUrl);
-  return { success: res.success !== false };
-}
-
-/**
- * Update walkthrough details on a lead record in Google Sheets
- */
-export async function updateWalkthroughInGoogleSheets(
-  leadId: string,
-  walkthroughData: Partial<LeadRecord>,
-  webhookUrl?: string
-): Promise<{ success: boolean }> {
-  try {
-    const cached = JSON.parse(localStorage.getItem(LOCAL_STORAGE_LEADS_KEY) || '[]');
-    const idx = cached.findIndex((l: LeadRecord) => l.leadId === leadId);
-    if (idx !== -1) {
-      cached[idx] = { ...cached[idx], ...walkthroughData, lastUpdated: new Date().toISOString() };
-      localStorage.setItem(LOCAL_STORAGE_LEADS_KEY, JSON.stringify(cached));
-    }
-  } catch (e) {
-    console.warn('[GoogleSheetsService] Cache update error', e);
-  }
-
-  const res = await postToWebhook('update_walkthrough', { leadId, ...walkthroughData }, webhookUrl);
-  return { success: res.success !== false };
-}
-
-/**
- * Update proposal status on a lead record in Google Sheets
- */
-export async function updateProposalInGoogleSheets(
-  leadId: string,
-  proposalData: Partial<LeadRecord>,
-  webhookUrl?: string
-): Promise<{ success: boolean }> {
-  try {
-    const cached = JSON.parse(localStorage.getItem(LOCAL_STORAGE_LEADS_KEY) || '[]');
-    const idx = cached.findIndex((l: LeadRecord) => l.leadId === leadId);
-    if (idx !== -1) {
-      cached[idx] = { ...cached[idx], ...proposalData, lastUpdated: new Date().toISOString() };
-      localStorage.setItem(LOCAL_STORAGE_LEADS_KEY, JSON.stringify(cached));
-    }
-  } catch (e) {
-    console.warn('[GoogleSheetsService] Cache update error', e);
-  }
-
-  const res = await postToWebhook('update_proposal', { leadId, ...proposalData }, webhookUrl);
   return { success: res.success !== false };
 }
 
@@ -211,7 +192,7 @@ export async function updateStatusInGoogleSheets(
     const cached = JSON.parse(localStorage.getItem(LOCAL_STORAGE_LEADS_KEY) || '[]');
     const idx = cached.findIndex((l: LeadRecord) => l.leadId === leadId);
     if (idx !== -1) {
-      cached[idx] = { ...cached[idx], status, lastUpdated: new Date().toISOString() };
+      cached[idx] = { ...cached[idx], status, updatedDate: new Date().toISOString().split('T')[0] };
       localStorage.setItem(LOCAL_STORAGE_LEADS_KEY, JSON.stringify(cached));
     }
   } catch (e) {
@@ -223,88 +204,29 @@ export async function updateStatusInGoogleSheets(
 }
 
 /**
- * Update complete lead information in Google Sheets in-place
+ * Update proposal status on a lead record in Google Sheets
  */
-export async function updateLeadInGoogleSheets(
-  lead: LeadRecord,
+export async function updateProposalInGoogleSheets(
+  leadId: string,
+  proposalData: Partial<LeadRecord>,
   webhookUrl?: string
 ): Promise<{ success: boolean }> {
   try {
     const cached = JSON.parse(localStorage.getItem(LOCAL_STORAGE_LEADS_KEY) || '[]');
-    const idx = cached.findIndex((l: LeadRecord) => l.leadId === lead.leadId);
+    const idx = cached.findIndex((l: LeadRecord) => l.leadId === leadId);
     if (idx !== -1) {
-      cached[idx] = lead;
-    } else {
-      cached.unshift(lead);
+      cached[idx] = { 
+        ...cached[idx], 
+        ...proposalData, 
+        status: 'Quoted',
+        updatedDate: new Date().toISOString().split('T')[0] 
+      };
+      localStorage.setItem(LOCAL_STORAGE_LEADS_KEY, JSON.stringify(cached));
     }
-    localStorage.setItem(LOCAL_STORAGE_LEADS_KEY, JSON.stringify(cached));
   } catch (e) {
     console.warn('[GoogleSheetsService] Cache update error', e);
   }
 
-  const res = await postToWebhook('update_lead', lead, webhookUrl);
+  const res = await postToWebhook('update_proposal', { leadId, ...proposalData }, webhookUrl);
   return { success: res.success !== false };
-}
-
-/**
- * Backwards compatibility for public walkthrough booking modal submissions
- */
-export async function submitBookingToGoogleSheets(
-  booking: WalkthroughBookingRecord,
-  webhookUrl?: string
-): Promise<{ success: boolean; bookingId: string; mode: 'live' | 'local_fallback' }> {
-  const targetUrl = resolveWebhookUrl(webhookUrl);
-
-  if (!targetUrl) {
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    return {
-      success: true,
-      bookingId: booking.bookingId,
-      mode: 'local_fallback'
-    };
-  }
-
-  try {
-    const response = await fetch(targetUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'text/plain;charset=utf-8'
-      },
-      body: JSON.stringify({
-        action: 'create_lead',
-        data: {
-          leadId: booking.bookingId,
-          createdDate: booking.submissionDate,
-          fullName: booking.fullName,
-          companyName: booking.companyName,
-          businessEmail: booking.businessEmail,
-          phoneNumber: booking.phoneNumber,
-          propertyAddress: '',
-          facilityType: booking.facilityType,
-          squareFootage: booking.squareFootage,
-          cleaningFrequency: booking.cleaningFrequency,
-          monthlyEstimate: booking.estimatedMonthlyInvestment || booking.ballparkEstimateHigh,
-          walkthroughStatus: 'SCHEDULED',
-          walkthroughDate: booking.preferredWalkthroughDate,
-          walkthroughTime: booking.preferredTimeWindow,
-          proposalStatus: 'NOT GENERATED',
-          status: 'WALKTHROUGH',
-          internalNotes: booking.cleaningFrustrations || '',
-          leadSource: 'Website'
-        }
-      })
-    });
-
-    return {
-      success: response.ok,
-      bookingId: booking.bookingId,
-      mode: 'live'
-    };
-  } catch {
-    return {
-      success: true,
-      bookingId: booking.bookingId,
-      mode: 'local_fallback'
-    };
-  }
 }

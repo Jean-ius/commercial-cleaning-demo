@@ -108,95 +108,70 @@ export interface ClientBrandConfig {
   googleAppsScriptUrl?: string; // Client's Google Apps Script Webhook
 }
 
-export type BookingStatus = 'NEW' | 'CONTACTED' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
+export type LeadStatus = 
+  | 'New'
+  | 'Contacted'
+  | 'Estimating'
+  | 'Quoted'
+  | 'Negotiation'
+  | 'Won'
+  | 'Lost';
 
-export interface WalkthroughBookingRecord {
-  bookingId: string;
-  submissionTimestamp: string;
-  submissionDate: string;
-  submissionTime: string;
-  
-  // Contact Information
-  fullName: string;
-  companyName: string;
-  businessEmail: string;
-  phoneNumber: string;
-  preferredWalkthroughDate: string;
-  preferredTimeWindow: string;
-  cleaningFrustrations?: string;
-  
-  // Estimator Snapshot at Submission Time
-  facilityType: string;
-  squareFootage: number;
-  cleaningFrequency: string;
-  ballparkEstimateLow: number;
-  ballparkEstimateHigh: number;
-  estimatedMonthlyInvestment: number;
-  ratePerVisit: number;
-  annualContractValue: number;
-  
-  // Internal Tracking & CRM Fields (Google Sheets Ready)
-  bookingStatus: BookingStatus;
-  confirmedDate: string;
-  confirmedTime: string;
-  assignedSalesRep: string;
-  internalNotes: string;
-  lastUpdated: string;
-}
+export type LeadSource = 
+  | 'Phone'
+  | 'Email'
+  | 'Referral'
+  | 'Website'
+  | 'LinkedIn'
+  | 'Other';
 
-// Backwards-compatible alias for existing imports
-export type WalkthroughLead = WalkthroughBookingRecord;
-
-export type LeadStatus = 'NEW' | 'QUALIFIED' | 'WALKTHROUGH' | 'PROPOSAL' | 'WON' | 'LOST';
-export type WalkthroughStatus = 'NOT SCHEDULED' | 'SCHEDULED' | 'COMPLETED' | 'CANCELLED';
-export type ProposalStatus = 'NOT GENERATED' | 'GENERATED' | 'SENT' | 'ACCEPTED';
-export type LeadSource = 'Phone' | 'Email' | 'Referral' | 'Website' | 'LinkedIn' | 'Other';
+export type ProposalStatus = 'Draft' | 'Sent' | 'Accepted' | 'Declined';
 
 export interface LeadRecord {
-  // Identity & Pipeline
-  leadId: string;                    // "LEAD-2026-0001"
-  status: LeadStatus;                // Initial: 'NEW'
-  leadSource: LeadSource;
-  createdDate: string;               // e.g. "Sep 4, 2026"
-  lastUpdated: string;               // ISO timestamp
-
-  // Contact
-  fullName: string;
+  // Required Canonical Lead Fields
+  leadId: string;
   companyName: string;
-  businessEmail: string;
-  phoneNumber: string;
+  contactPerson: string;
+  email: string;
+  phone: string;
+  projectName: string;
+  projectType: string;
+  projectLocation: string;
+  estimatedValue: number;
+  leadSource: LeadSource;
+  status: LeadStatus;
+  notes: string;
+  dateCreated: string;
+  updatedDate: string;
 
-  // Facility
-  propertyAddress: string;
-  facilityType: FacilitySectorId;
-  squareFootage: number;
-  cleaningFrequency: FrequencyId;
-  selectedAddOns: AddOnServiceId[];
-  specialRequirements: string;
-  internalNotes: string;
+  // Estimator Connection & Technical Specs
+  squareFootage?: number;
+  facilityType?: FacilitySectorId;
+  cleaningFrequency?: FrequencyId;
+  selectedAddOns?: AddOnServiceId[];
+  ratePerVisit?: number;
+  annualContractValue?: number;
+  estimatedLaborHours?: number;
+  recommendedCrewSize?: number;
+  estimateSnapshot?: EstimateResult;
 
-  // Estimate Snapshot (populated after calculation)
-  monthlyEstimate: number;
-  ratePerVisit: number;
-  annualContractValue: number;
-  estimatedLaborHours: number;
-  recommendedCrewSize: number;
-  estimateSnapshot?: EstimateResult;  // Full engine output
+  // Proposal Connection
+  proposalId?: string;
+  proposalStatus?: ProposalStatus;
+  proposalIssueDate?: string;
+  proposalValidThrough?: string;
+  proposalSentDate?: string;
 
-  // Walkthrough (optional, independent of Lead Status)
-  walkthroughStatus: WalkthroughStatus;  // Default: 'NOT SCHEDULED'
-  walkthroughDate: string;
-  walkthroughTime: string;
-  assignedSalesRep: string;
-  meetingInstructions: string;
-  walkthroughNotes: string;
-
-  // Proposal (independent of walkthrough)
-  proposalId: string;
-  proposalStatus: ProposalStatus;     // Default: 'NOT GENERATED'
-  proposalIssueDate: string;
-  proposalValidThrough: string;
-  proposalSentDate: string;
+  // Compatibility helpers
+  fullName?: string;
+  businessEmail?: string;
+  phoneNumber?: string;
+  propertyAddress?: string;
+  monthlyEstimate?: number;
+  createdDate?: string;
+  lastUpdated?: string;
+  internalNotes?: string;
+  specialRequirements?: string;
 }
 
 export interface ProposalData {

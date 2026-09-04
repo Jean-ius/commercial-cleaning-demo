@@ -1,13 +1,12 @@
 /**
- * Ready-to-Deploy Google Apps Script for Client-Owned Google Sheet CRM
+ * Ready-to-Deploy Google Apps Script for Client-Owned Google Sheet Database
  * 
  * Instructions for New Client Onboarding:
  * 1. Open Google Sheets (https://sheets.new) in the client's Google account.
  * 2. Click Extensions > Apps Script.
  * 3. Paste the entire script below into Code.gs.
- * 4. Run `setupSpreadsheet` once to automatically create and format the 4 sheets:
- *    - Leads (15 human-readable columns)
- *    - Lead Details (complete LeadRecord persistence)
+ * 4. Run `setupSpreadsheet` once to automatically create and format the sheets:
+ *    - Leads (14 canonical prospect columns + estimating specs)
  *    - Settings (company branding & terms)
  *    - Activity Log (audit trail)
  * 5. Click Deploy > New Deployment > Select Type: "Web App".
@@ -17,30 +16,34 @@
 
 export const googleAppsScriptTemplate = `
 /**
- * CleanCommand Pro - Commercial Cleaning Sales & Estimating System Backend
- * 4-Sheet Architecture: Leads, Lead Details, Settings, Activity Log
+ * CleanCommand Pro - Sales Leads & Estimating Database Backend
+ * Sheets: Leads, Settings, Activity Log
  */
 
 var SHEET_NAMES = {
   LEADS: "Leads",
-  LEAD_DETAILS: "Lead Details",
   SETTINGS: "Settings",
   ACTIVITY_LOG: "Activity Log"
 };
 
 var LEADS_HEADERS = [
-  "Lead ID", "Date", "Contact Name", "Company", "Email", "Phone",
-  "Property", "Facility Type", "Square Footage", "Frequency",
-  "Monthly Estimate", "Walkthrough", "Proposal", "Status", "Notes"
-];
-
-var LEAD_DETAILS_HEADERS = [
-  "Lead ID", "Lead Source", "Property Address", "Selected Add-Ons",
-  "Special Requirements", "Rate Per Visit", "Annual Contract Value",
-  "Estimated Labor Hours", "Recommended Crew Size", "Walkthrough Date",
-  "Walkthrough Time", "Assigned Sales Rep", "Meeting Instructions",
-  "Walkthrough Notes", "Proposal ID", "Proposal Issue Date",
-  "Proposal Valid Through", "Proposal Sent Date", "Last Updated"
+  "Lead ID",
+  "Company Name",
+  "Contact Person",
+  "Email",
+  "Phone",
+  "Project Name",
+  "Project Type",
+  "Project Location",
+  "Estimated Value",
+  "Lead Source",
+  "Status",
+  "Notes",
+  "Date Created",
+  "Updated Date",
+  "Square Footage",
+  "Cleaning Frequency",
+  "Proposal ID"
 ];
 
 var DEFAULT_SETTINGS = [
@@ -54,9 +57,8 @@ var DEFAULT_SETTINGS = [
   ["Insurance Information", "$2,000,000 Commercial General Liability & Full Bond"],
   ["Default Proposal Validity", "30 Days"],
   ["Default Payment Terms", "Invoiced monthly on Net-30 terms. 12-month standard term with 30-day mutual flexibility."],
-  ["Default SLA", "4-hour prompt re-clean response at zero added charge if any area is unsatisfactory."],
-  ["Industry Standards / Service Specifications", "ISSA 540 Workloading • EPA List N Disinfection"],
-  ["Default Assigned Sales Representative", "Marcus Sterling"],
+  ["Default SLA", "4-hour prompt response at zero added charge if any area is unsatisfactory."],
+  ["Industry Standards / Specifications", "ISSA 540 Workloading • EPA List N Certified"],
   ["Notification Email", "admin@apexcommercialcleaning.com"]
 ];
 
@@ -71,209 +73,326 @@ function setupSpreadsheet() {
   var leadsSheet = ss.getSheetByName(SHEET_NAMES.LEADS) || ss.insertSheet(SHEET_NAMES.LEADS, 0);
   leadsSheet.clear();
   leadsSheet.appendRow(LEADS_HEADERS);
-  leadsSheet.getRange(1, 1, 1, 15).setBackground("#0F172A").setFontColor("#FFFFFF").setFontWeight("bold").setFontFamily("Arial").setFontSize(10).setHorizontalAlignment("center");
+  leadsSheet.getRange(1, 1, 1, LEADS_HEADERS.length)
+    .setBackground("#0F172A")
+    .setFontColor("#FFFFFF")
+    .setFontWeight("bold")
+    .setFontFamily("Arial")
+    .setFontSize(10)
+    .setHorizontalAlignment("center");
   leadsSheet.setRowHeight(1, 38);
   leadsSheet.setFrozenRows(1);
-  var widths = [140, 110, 160, 190, 210, 140, 200, 170, 120, 130, 140, 130, 130, 120, 260];
-  for (var i = 0; i < widths.length; i++) leadsSheet.setColumnWidth(i + 1, widths[i]);
-  leadsSheet.getRange("I2:I1000").setNumberFormat("#,##0").setHorizontalAlignment("right");
-  leadsSheet.getRange("K2:K1000").setNumberFormat("$#,##0").setHorizontalAlignment("right");
-  leadsSheet.getRange("O2:O1000").setWrap(true);
 
-  var wtRule = SpreadsheetApp.newDataValidation().requireValueInList(["NOT SCHEDULED", "SCHEDULED", "COMPLETED", "CANCELLED"], true).build();
-  leadsSheet.getRange("L2:L1000").setDataValidation(wtRule);
-  var propRule = SpreadsheetApp.newDataValidation().requireValueInList(["NOT GENERATED", "GENERATED", "SENT", "ACCEPTED"], true).build();
-  leadsSheet.getRange("M2:M1000").setDataValidation(propRule);
-  var statRule = SpreadsheetApp.newDataValidation().requireValueInList(["NEW", "QUALIFIED", "WALKTHROUGH", "PROPOSAL", "WON", "LOST"], true).build();
-  leadsSheet.getRange("N2:N1000").setDataValidation(statRule);
+  var widths = [130, 200, 160, 210, 140, 200, 180, 240, 140, 130, 130, 260, 110, 110, 120, 140, 140];
+  for (var i = 0; i < widths.length; i++) {
+    if (i < LEADS_HEADERS.length) leadsSheet.setColumnWidth(i + 1, widths[i]);
+  }
 
-  var detailsSheet = ss.getSheetByName(SHEET_NAMES.LEAD_DETAILS) || ss.insertSheet(SHEET_NAMES.LEAD_DETAILS, 1);
-  detailsSheet.clear();
-  detailsSheet.appendRow(LEAD_DETAILS_HEADERS);
-  detailsSheet.getRange(1, 1, 1, LEAD_DETAILS_HEADERS.length).setBackground("#1E293B").setFontColor("#FFFFFF").setFontWeight("bold").setFontSize(10);
-  detailsSheet.setRowHeight(1, 35);
-  detailsSheet.setFrozenRows(1);
+  // Formatting: Currency on Estimated Value (Col 9), Number on Square Footage (Col 15)
+  leadsSheet.getRange("I2:I1000").setNumberFormat("$#,##0").setHorizontalAlignment("right");
+  leadsSheet.getRange("O2:O1000").setNumberFormat("#,##0").setHorizontalAlignment("right");
+  leadsSheet.getRange("L2:L1000").setWrap(true);
 
-  var settingsSheet = ss.getSheetByName(SHEET_NAMES.SETTINGS) || ss.insertSheet(SHEET_NAMES.SETTINGS, 2);
+  // Status dropdown validation (Col 11)
+  var statRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(["New", "Contacted", "Estimating", "Quoted", "Negotiation", "Won", "Lost"], true)
+    .build();
+  leadsSheet.getRange("K2:K1000").setDataValidation(statRule);
+
+  // Settings sheet
+  var settingsSheet = ss.getSheetByName(SHEET_NAMES.SETTINGS) || ss.insertSheet(SHEET_NAMES.SETTINGS, 1);
   settingsSheet.clear();
   settingsSheet.appendRow(["Setting Key", "Setting Value"]);
   settingsSheet.getRange(1, 1, 1, 2).setBackground("#0F172A").setFontColor("#FFFFFF").setFontWeight("bold");
-  for (var j = 0; j < DEFAULT_SETTINGS.length; j++) settingsSheet.appendRow(DEFAULT_SETTINGS[j]);
+  for (var s = 0; s < DEFAULT_SETTINGS.length; s++) {
+    settingsSheet.appendRow(DEFAULT_SETTINGS[s]);
+  }
+  settingsSheet.setColumnWidth(1, 260);
+  settingsSheet.setColumnWidth(2, 450);
 
-  var logSheet = ss.getSheetByName(SHEET_NAMES.ACTIVITY_LOG) || ss.insertSheet(SHEET_NAMES.ACTIVITY_LOG, 3);
+  // Activity Log sheet
+  var logSheet = ss.getSheetByName(SHEET_NAMES.ACTIVITY_LOG) || ss.insertSheet(SHEET_NAMES.ACTIVITY_LOG, 2);
   logSheet.clear();
   logSheet.appendRow(ACTIVITY_LOG_HEADERS);
   logSheet.getRange(1, 1, 1, ACTIVITY_LOG_HEADERS.length).setBackground("#334155").setFontColor("#FFFFFF").setFontWeight("bold");
+  logSheet.setRowHeight(1, 32);
+  logSheet.setFrozenRows(1);
 }
 
 function doGet(e) {
-  try {
-    var action = (e && e.parameter && e.parameter.action) ? e.parameter.action : "get_leads";
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var action = (e && e.parameter && e.parameter.action) || "get_leads";
 
-    if (action === "get_leads") {
-      var leadsSheet = ss.getSheetByName(SHEET_NAMES.LEADS);
-      if (!leadsSheet || leadsSheet.getLastRow() < 2) return jsonResponse({ success: true, count: 0, leads: [] });
-      var values = leadsSheet.getRange(2, 1, leadsSheet.getLastRow() - 1, 15).getValues();
-      var list = [];
-      for (var i = 0; i < values.length; i++) {
-        var r = values[i];
-        if (!r[0]) continue;
-        list.push({
-          leadId: String(r[0]),
-          createdDate: String(r[1]),
-          fullName: String(r[2]),
-          companyName: String(r[3]),
-          businessEmail: String(r[4]),
-          phoneNumber: String(r[5]),
-          propertyAddress: String(r[6]),
-          facilityType: String(r[7]),
-          squareFootage: Number(r[8]) || 0,
-          cleaningFrequency: String(r[9]),
-          monthlyEstimate: Number(r[10]) || 0,
-          walkthroughStatus: String(r[11] || "NOT SCHEDULED"),
-          proposalStatus: String(r[12] || "NOT GENERATED"),
-          status: String(r[13] || "NEW"),
-          internalNotes: String(r[14] || "")
-        });
-      }
-      return jsonResponse({ success: true, count: list.length, leads: list });
-    }
-
-    if (action === "get_settings") {
-      var sSheet = ss.getSheetByName(SHEET_NAMES.SETTINGS);
-      var map = {};
-      if (sSheet && sSheet.getLastRow() >= 2) {
-        var sVals = sSheet.getRange(2, 1, sSheet.getLastRow() - 1, 2).getValues();
-        for (var k = 0; k < sVals.length; k++) map[String(sVals[k][0])] = sVals[k][1];
-      }
-      return jsonResponse({ success: true, settings: map });
-    }
-
-    return jsonResponse({ success: false, error: "Invalid action" }, 400);
-  } catch (err) {
-    return jsonResponse({ success: false, error: err.toString() }, 500);
+  if (action === "get_leads") {
+    return handleGetLeads();
+  } else if (action === "get_settings") {
+    return handleGetSettings();
   }
+
+  return ContentService.createTextOutput(JSON.stringify({ success: true, message: "CleanCommand API Online" }))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 function doPost(e) {
   var lock = LockService.getScriptLock();
   try {
-    lock.waitLock(30000);
-    var payload = JSON.parse(e.postData.contents);
-    var action = payload.action;
-    var data = payload.data || payload;
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    lock.waitLock(15000);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ success: false, error: "Server busy, please retry." }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
 
+  try {
+    var body = e && e.postData && e.postData.contents ? JSON.parse(e.postData.contents) : {};
+    var action = body.action;
+    var data = body.data || {};
+
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
     var leadsSheet = ss.getSheetByName(SHEET_NAMES.LEADS);
-    var detailsSheet = ss.getSheetByName(SHEET_NAMES.LEAD_DETAILS);
     var logSheet = ss.getSheetByName(SHEET_NAMES.ACTIVITY_LOG);
 
-    function findRow(id) {
-      if (!leadsSheet || leadsSheet.getLastRow() < 2) return -1;
-      var colA = leadsSheet.getRange(2, 1, leadsSheet.getLastRow() - 1, 1).getValues();
-      for (var i = 0; i < colA.length; i++) {
-        if (String(colA[i][0]).trim() === String(id).trim()) return i + 2;
-      }
-      return -1;
+    if (!leadsSheet) {
+      setupSpreadsheet();
+      leadsSheet = ss.getSheetByName(SHEET_NAMES.LEADS);
     }
 
     if (action === "create_lead") {
-      var row = findRow(data.leadId);
-      if (row !== -1) {
-        // already exists, update
-        action = "update_lead";
-      } else {
-        var leadId = data.leadId || ("LEAD-" + new Date().getFullYear() + "-" + ("0000" + leadsSheet.getLastRow()).slice(-4));
-        leadsSheet.appendRow([
-          leadId, data.createdDate || "", data.fullName || "", data.companyName || "",
-          data.businessEmail || "", data.phoneNumber || "", data.propertyAddress || "",
-          data.facilityType || "", Number(data.squareFootage) || 0, data.cleaningFrequency || "",
-          Number(data.monthlyEstimate) || 0, data.walkthroughStatus || "NOT SCHEDULED",
-          data.proposalStatus || "NOT GENERATED", data.status || "NEW", data.internalNotes || ""
+      var leadId = data.leadId || ("LD-" + Date.now().toString(36).toUpperCase());
+      var dateCreated = data.dateCreated || new Date().toISOString().split("T")[0];
+      var updatedDate = new Date().toISOString().split("T")[0];
+
+      leadsSheet.appendRow([
+        leadId,
+        data.companyName || "",
+        data.contactPerson || data.fullName || "",
+        data.email || data.businessEmail || "",
+        data.phone || data.phoneNumber || "",
+        data.projectName || data.companyName || "",
+        data.projectType || data.facilityType || "Commercial Office",
+        data.projectLocation || data.propertyAddress || "",
+        Number(data.estimatedValue || data.monthlyEstimate || data.annualContractValue) || 0,
+        data.leadSource || "Website",
+        data.status || "New",
+        data.notes || data.internalNotes || "",
+        dateCreated,
+        updatedDate,
+        Number(data.squareFootage) || 0,
+        data.cleaningFrequency || "",
+        data.proposalId || ""
+      ]);
+
+      if (logSheet) {
+        logSheet.appendRow([
+          "ACT-" + Date.now().toString(36).toUpperCase(),
+          leadId,
+          new Date().toLocaleString(),
+          "LEAD CREATED",
+          "",
+          data.status || "New",
+          "Web User",
+          "Initial lead created for " + (data.companyName || "Prospect")
         ]);
-        if (detailsSheet) {
-          detailsSheet.appendRow([
-            leadId, data.leadSource || "Website", data.propertyAddress || "",
-            Array.isArray(data.selectedAddOns) ? data.selectedAddOns.join(", ") : "",
-            data.specialRequirements || "", Number(data.ratePerVisit) || 0,
-            Number(data.annualContractValue) || 0, Number(data.estimatedLaborHours) || 0,
-            Number(data.recommendedCrewSize) || 1, data.walkthroughDate || "",
-            data.walkthroughTime || "", data.assignedSalesRep || "",
-            data.meetingInstructions || "", data.walkthroughNotes || "",
-            data.proposalId || "", data.proposalIssueDate || "",
-            data.proposalValidThrough || "", data.proposalSentDate || "", new Date().toISOString()
-          ]);
-        }
-        if (logSheet) logSheet.appendRow(["ACT-" + Date.now().toString(36).toUpperCase(), leadId, new Date().toLocaleString(), "LEAD CREATED", "", data.status || "NEW", "System", "Created lead"]);
-        return jsonResponse({ success: true, leadId: leadId });
       }
-    }
 
-    if (action === "save_estimate") {
-      var rIdx = findRow(data.leadId);
-      if (rIdx === -1) return jsonResponse({ success: false, error: "Lead not found" }, 404);
-      if (data.monthlyEstimate !== undefined) leadsSheet.getRange(rIdx, 11).setValue(Number(data.monthlyEstimate) || 0);
-      if (data.facilityType) leadsSheet.getRange(rIdx, 8).setValue(data.facilityType);
-      if (data.squareFootage) leadsSheet.getRange(rIdx, 9).setValue(Number(data.squareFootage) || 0);
-      if (data.cleaningFrequency) leadsSheet.getRange(rIdx, 10).setValue(data.cleaningFrequency);
-      if (logSheet) logSheet.appendRow(["ACT-" + Date.now().toString(36).toUpperCase(), data.leadId, new Date().toLocaleString(), "ESTIMATE SAVED", "", "", "Estimator", "Saved estimate $" + data.monthlyEstimate]);
-      return jsonResponse({ success: true, leadId: data.leadId });
-    }
-
-    if (action === "update_status") {
-      var sIdx = findRow(data.leadId);
-      if (sIdx === -1) return jsonResponse({ success: false, error: "Lead not found" }, 404);
-      var prev = leadsSheet.getRange(sIdx, 14).getValue();
-      leadsSheet.getRange(sIdx, 14).setValue(data.status);
-      if (logSheet) logSheet.appendRow(["ACT-" + Date.now().toString(36).toUpperCase(), data.leadId, new Date().toLocaleString(), "STATUS CHANGE", prev, data.status, data.user || "Staff", data.notes || ""]);
-      return jsonResponse({ success: true, leadId: data.leadId, status: data.status });
-    }
-
-    if (action === "update_walkthrough") {
-      var wIdx = findRow(data.leadId);
-      if (wIdx === -1) return jsonResponse({ success: false, error: "Lead not found" }, 404);
-      leadsSheet.getRange(wIdx, 12).setValue(data.walkthroughStatus || "SCHEDULED");
-      if (logSheet) logSheet.appendRow(["ACT-" + Date.now().toString(36).toUpperCase(), data.leadId, new Date().toLocaleString(), "WALKTHROUGH SCHEDULED", "", "", data.assignedSalesRep || "Staff", "Scheduled walkthrough"]);
-      return jsonResponse({ success: true, leadId: data.leadId });
-    }
-
-    if (action === "update_proposal") {
-      var pIdx = findRow(data.leadId);
-      if (pIdx === -1) return jsonResponse({ success: false, error: "Lead not found" }, 404);
-      leadsSheet.getRange(pIdx, 13).setValue(data.proposalStatus || "GENERATED");
-      if (logSheet) logSheet.appendRow(["ACT-" + Date.now().toString(36).toUpperCase(), data.leadId, new Date().toLocaleString(), "PROPOSAL GENERATED", "", "", "Staff", "Proposal generated"]);
-      return jsonResponse({ success: true, leadId: data.leadId });
+      return ContentService.createTextOutput(JSON.stringify({ success: true, leadId: leadId }))
+        .setMimeType(ContentService.MimeType.JSON);
     }
 
     if (action === "update_lead") {
-      var uIdx = findRow(data.leadId);
-      if (uIdx === -1) return jsonResponse({ success: false, error: "Lead not found" }, 404);
-      if (data.fullName !== undefined) leadsSheet.getRange(uIdx, 3).setValue(data.fullName);
-      if (data.companyName !== undefined) leadsSheet.getRange(uIdx, 4).setValue(data.companyName);
-      if (data.businessEmail !== undefined) leadsSheet.getRange(uIdx, 5).setValue(data.businessEmail);
-      if (data.phoneNumber !== undefined) leadsSheet.getRange(uIdx, 6).setValue(data.phoneNumber);
-      if (data.propertyAddress !== undefined) leadsSheet.getRange(uIdx, 7).setValue(data.propertyAddress);
-      if (data.facilityType !== undefined) leadsSheet.getRange(uIdx, 8).setValue(data.facilityType);
-      if (data.squareFootage !== undefined) leadsSheet.getRange(uIdx, 9).setValue(Number(data.squareFootage) || 0);
-      if (data.cleaningFrequency !== undefined) leadsSheet.getRange(uIdx, 10).setValue(data.cleaningFrequency);
-      if (data.monthlyEstimate !== undefined) leadsSheet.getRange(uIdx, 11).setValue(Number(data.monthlyEstimate) || 0);
-      if (data.walkthroughStatus !== undefined) leadsSheet.getRange(uIdx, 12).setValue(data.walkthroughStatus);
-      if (data.proposalStatus !== undefined) leadsSheet.getRange(uIdx, 13).setValue(data.proposalStatus);
-      if (data.status !== undefined) leadsSheet.getRange(uIdx, 14).setValue(data.status);
-      if (data.internalNotes !== undefined) leadsSheet.getRange(uIdx, 15).setValue(data.internalNotes);
-      return jsonResponse({ success: true, leadId: data.leadId });
+      var uRow = findLeadRow(leadsSheet, data.leadId);
+      if (uRow > 0) {
+        if (data.companyName !== undefined) leadsSheet.getRange(uRow, 2).setValue(data.companyName);
+        if (data.contactPerson !== undefined || data.fullName !== undefined) leadsSheet.getRange(uRow, 3).setValue(data.contactPerson || data.fullName);
+        if (data.email !== undefined || data.businessEmail !== undefined) leadsSheet.getRange(uRow, 4).setValue(data.email || data.businessEmail);
+        if (data.phone !== undefined || data.phoneNumber !== undefined) leadsSheet.getRange(uRow, 5).setValue(data.phone || data.phoneNumber);
+        if (data.projectName !== undefined) leadsSheet.getRange(uRow, 6).setValue(data.projectName);
+        if (data.projectType !== undefined) leadsSheet.getRange(uRow, 7).setValue(data.projectType);
+        if (data.projectLocation !== undefined || data.propertyAddress !== undefined) leadsSheet.getRange(uRow, 8).setValue(data.projectLocation || data.propertyAddress);
+        if (data.estimatedValue !== undefined) leadsSheet.getRange(uRow, 9).setValue(Number(data.estimatedValue));
+        if (data.leadSource !== undefined) leadsSheet.getRange(uRow, 10).setValue(data.leadSource);
+        if (data.status !== undefined) leadsSheet.getRange(uRow, 11).setValue(data.status);
+        if (data.notes !== undefined || data.internalNotes !== undefined) leadsSheet.getRange(uRow, 12).setValue(data.notes || data.internalNotes);
+        leadsSheet.getRange(uRow, 14).setValue(new Date().toISOString().split("T")[0]);
+
+        if (logSheet) {
+          logSheet.appendRow([
+            "ACT-" + Date.now().toString(36).toUpperCase(),
+            data.leadId,
+            new Date().toLocaleString(),
+            "LEAD UPDATED",
+            "",
+            data.status || "",
+            "Staff",
+            "Lead record updated in-place"
+          ]);
+        }
+      }
+      return ContentService.createTextOutput(JSON.stringify({ success: true }))
+        .setMimeType(ContentService.MimeType.JSON);
     }
 
-    return jsonResponse({ success: false, error: "Unknown action" }, 400);
+    if (action === "save_estimate") {
+      var eRow = findLeadRow(leadsSheet, data.leadId);
+      if (eRow > 0) {
+        if (data.estimatedValue !== undefined || data.annualContractValue !== undefined) {
+          leadsSheet.getRange(eRow, 9).setValue(Number(data.estimatedValue || data.annualContractValue));
+        }
+        if (data.squareFootage !== undefined) leadsSheet.getRange(eRow, 15).setValue(Number(data.squareFootage));
+        if (data.cleaningFrequency !== undefined) leadsSheet.getRange(eRow, 16).setValue(data.cleaningFrequency);
+        leadsSheet.getRange(eRow, 11).setValue("Estimating");
+        leadsSheet.getRange(eRow, 14).setValue(new Date().toISOString().split("T")[0]);
+
+        if (logSheet) {
+          logSheet.appendRow([
+            "ACT-" + Date.now().toString(36).toUpperCase(),
+            data.leadId,
+            new Date().toLocaleString(),
+            "ESTIMATE SAVED",
+            "",
+            "Estimating",
+            "Estimator",
+            "Estimate calculated & saved"
+          ]);
+        }
+      }
+      return ContentService.createTextOutput(JSON.stringify({ success: true }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (action === "update_status") {
+      var sRow = findLeadRow(leadsSheet, data.leadId);
+      if (sRow > 0) {
+        leadsSheet.getRange(sRow, 11).setValue(data.status);
+        leadsSheet.getRange(sRow, 14).setValue(new Date().toISOString().split("T")[0]);
+
+        if (logSheet) {
+          logSheet.appendRow([
+            "ACT-" + Date.now().toString(36).toUpperCase(),
+            data.leadId,
+            new Date().toLocaleString(),
+            "STATUS CHANGE",
+            data.previousStatus || "",
+            data.status,
+            "Staff",
+            "Status updated to " + data.status
+          ]);
+        }
+      }
+      return ContentService.createTextOutput(JSON.stringify({ success: true }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (action === "update_proposal") {
+      var pRow = findLeadRow(leadsSheet, data.leadId);
+      if (pRow > 0) {
+        if (data.proposalId) leadsSheet.getRange(pRow, 17).setValue(data.proposalId);
+        leadsSheet.getRange(pRow, 11).setValue("Quoted");
+        leadsSheet.getRange(pRow, 14).setValue(new Date().toISOString().split("T")[0]);
+
+        if (logSheet) {
+          logSheet.appendRow([
+            "ACT-" + Date.now().toString(36).toUpperCase(),
+            data.leadId,
+            new Date().toLocaleString(),
+            "PROPOSAL GENERATED",
+            "",
+            "Quoted",
+            "Proposal Engine",
+            "Proposal " + (data.proposalId || "") + " attached"
+          ]);
+        }
+      }
+      return ContentService.createTextOutput(JSON.stringify({ success: true }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({ success: false, error: "Unknown action" }))
+      .setMimeType(ContentService.MimeType.JSON);
+
   } catch (err) {
-    return jsonResponse({ success: false, error: err.toString() }, 500);
+    return ContentService.createTextOutput(JSON.stringify({ success: false, error: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
   } finally {
     lock.releaseLock();
   }
 }
 
-function jsonResponse(obj, code) {
-  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+function handleGetLeads() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEET_NAMES.LEADS);
+  if (!sheet) {
+    setupSpreadsheet();
+    sheet = ss.getSheetByName(SHEET_NAMES.LEADS);
+  }
+
+  var data = sheet.getDataRange().getValues();
+  if (data.length <= 1) {
+    return ContentService.createTextOutput(JSON.stringify({ success: true, leads: [] }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  var leads = [];
+  for (var i = 1; i < data.length; i++) {
+    var r = data[i];
+    if (!r[0]) continue;
+
+    leads.push({
+      leadId: String(r[0]),
+      companyName: String(r[1] || ""),
+      contactPerson: String(r[2] || ""),
+      email: String(r[3] || ""),
+      phone: String(r[4] || ""),
+      projectName: String(r[5] || ""),
+      projectType: String(r[6] || "Commercial Office"),
+      projectLocation: String(r[7] || ""),
+      estimatedValue: Number(r[8]) || 0,
+      leadSource: String(r[9] || "Website"),
+      status: String(r[10] || "New"),
+      notes: String(r[11] || ""),
+      dateCreated: String(r[12] || ""),
+      updatedDate: String(r[13] || ""),
+      squareFootage: Number(r[14]) || 12000,
+      cleaningFrequency: String(r[15] || "business_5x"),
+      proposalId: String(r[16] || ""),
+
+      // Compatibility helpers
+      fullName: String(r[2] || ""),
+      businessEmail: String(r[3] || ""),
+      phoneNumber: String(r[4] || ""),
+      propertyAddress: String(r[7] || ""),
+      monthlyEstimate: Math.round((Number(r[8]) || 0) / 12) || 0,
+      createdDate: String(r[12] || ""),
+      lastUpdated: String(r[13] || ""),
+      internalNotes: String(r[11] || "")
+    });
+  }
+
+  return ContentService.createTextOutput(JSON.stringify({ success: true, leads: leads }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function handleGetSettings() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEET_NAMES.SETTINGS);
+  if (!sheet) return ContentService.createTextOutput(JSON.stringify({ success: false })).setMimeType(ContentService.MimeType.JSON);
+
+  var rows = sheet.getDataRange().getValues();
+  var settings = {};
+  for (var i = 1; i < rows.length; i++) {
+    if (rows[i][0]) settings[String(rows[i][0])] = rows[i][1];
+  }
+
+  return ContentService.createTextOutput(JSON.stringify({ success: true, settings: settings }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function findLeadRow(sheet, leadId) {
+  if (!leadId) return -1;
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]).trim() === String(leadId).trim()) {
+      return i + 1; // 1-indexed row number
+    }
+  }
+  return -1;
 }
 `;

@@ -4,6 +4,7 @@ import {
   EstimateResult, 
   LeadRecord, 
   LeadStatus,
+  ProposalStatus,
   FacilitySectorId,
   FrequencyId,
   AddOnServiceId
@@ -20,13 +21,13 @@ import { Toast } from './components/Toast';
 import { Footer } from './components/Footer';
 import { SalesDashboard } from './components/leads/SalesDashboard';
 import { NewLeadModal } from './components/leads/NewLeadModal';
-import { InternalWalkthroughModal } from './components/leads/InternalWalkthroughModal';
+import { LeadDetailEditModal } from './components/leads/LeadDetailEditModal';
 import { CommercialQuoteCalculator } from './components/calculator/CommercialQuoteCalculator';
 import { 
   loadLeadsFromGoogleSheets, 
   createLeadInGoogleSheets, 
+  updateLeadInGoogleSheets,
   saveEstimateToGoogleSheets, 
-  updateWalkthroughInGoogleSheets, 
   updateProposalInGoogleSheets, 
   updateStatusInGoogleSheets 
 } from './services/googleSheetsService';
@@ -51,8 +52,8 @@ export const App: React.FC = () => {
     return defaultClientBrand;
   });
 
-  // Current view: default to internal 'sales' hub for sales team
-  const [currentView, setCurrentView] = useState<'sales' | 'landing' | 'proposal' | 'packages'>('sales');
+  // Current view: default to 'landing' for corporate presentation
+  const [currentView, setCurrentView] = useState<'sales' | 'landing' | 'proposal' | 'packages'>('landing');
 
   // Leads CRM State
   const [leads, setLeads] = useState<LeadRecord[]>(() => {
@@ -82,7 +83,14 @@ export const App: React.FC = () => {
 
   // Modal controls
   const [isNewLeadModalOpen, setIsNewLeadModalOpen] = useState(false);
-  const [isWalkthroughModalOpen, setIsWalkthroughModalOpen] = useState(false);
+  const [isEditLeadModalOpen, setIsEditLeadModalOpen] = useState(false);
+  const [selectedLeadForEdit, setSelectedLeadForEdit] = useState<LeadRecord | null>(null);
+  const [initialSpecsForNewLead, setInitialSpecsForNewLead] = useState<{
+    squareFootage?: number;
+    facilityType?: FacilitySectorId;
+    cleaningFrequency?: FrequencyId;
+    estimatedValue?: number;
+  } | undefined>(undefined);
 
   // Toast feedback
   const [toastMsg, setToastMsg] = useState<string>('');
@@ -118,13 +126,29 @@ export const App: React.FC = () => {
   const handleCreateLead = async (newLead: LeadRecord) => {
     setLeads(prev => [newLead, ...prev]);
     setActiveLead(newLead);
-    setActiveEstimate(newLead.estimateSnapshot || calculateCommercialEstimate(newLead.squareFootage, newLead.facilityType, newLead.cleaningFrequency, newLead.selectedAddOns));
+    if (newLead.estimateSnapshot) {
+      setActiveEstimate(newLead.estimateSnapshot);
+    }
     triggerToast(`Created lead ${newLead.leadId} for ${newLead.companyName}!`);
 
     try {
       await createLeadInGoogleSheets(newLead, brandConfig.googleAppsScriptUrl);
     } catch (e) {
       console.warn('Failed to sync new lead to Google Sheets:', e);
+    }
+  };
+
+  const handleUpdateLead = async (updatedLead: LeadRecord) => {
+    setLeads(prev => prev.map(l => l.leadId === updatedLead.leadId ? updatedLead : l));
+    if (activeLead && activeLead.leadId === updatedLead.leadId) {
+      setActiveLead(updatedLead);
+    }
+    triggerToast(`Updated lead ${updatedLead.leadId} (${updatedLead.companyName})!`);
+
+    try {
+      await updateLeadInGoogleSheets(updatedLead, brandConfig.googleAppsScriptUrl);
+    } catch (e) {
+      console.warn('Failed to sync lead update to Google Sheets:', e);
     }
   };
 
@@ -145,12 +169,17 @@ export const App: React.FC = () => {
       facilityType: facilitySpecs.facilityType,
       cleaningFrequency: facilitySpecs.cleaningFrequency,
       selectedAddOns: facilitySpecs.selectedAddOns,
-      monthlyEstimate: estimate.totalEstimatedMonthlyInvestment,
+      estimatedValue: estimate.annualContractValue,
       ratePerVisit: estimate.pricePerVisit,
       annualContractValue: estimate.annualContractValue,
       estimatedLaborHours: estimate.hoursPerCleaningVisit,
       recommendedCrewSize: estimate.recommendedCrewSize,
       estimateSnapshot: estimate,
+      status: activeLead.status === 'New' ? 'Estimating' : activeLead.status,
+      updatedDate: new Date().toISOString().split('T')[0],
+
+      // Compatibility helpers
+      monthlyEstimate: estimate.totalEstimatedMonthlyInvestment,
       lastUpdated: new Date().toISOString()
     };
 
@@ -161,6 +190,7 @@ export const App: React.FC = () => {
 
     try {
       await saveEstimateToGoogleSheets(updatedLead.leadId, {
+        estimatedValue: estimate.annualContractValue,
         monthlyEstimate: estimate.totalEstimatedMonthlyInvestment,
         ratePerVisit: estimate.pricePerVisit,
         annualContractValue: estimate.annualContractValue,
@@ -176,33 +206,43 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleSaveWalkthrough = async (updatedFields: Partial<LeadRecord>) => {
-    if (!activeLead) return;
-
-    const updatedLead: LeadRecord = {
-      ...activeLead,
-      ...updatedFields,
-      lastUpdated: new Date().toISOString()
-    };
-
-    setActiveLead(updatedLead);
-    setLeads(prev => prev.map(l => l.leadId === updatedLead.leadId ? updatedLead : l));
-    triggerToast(`Updated walkthrough for ${updatedLead.companyName}!`);
-
-    try {
-      await updateWalkthroughInGoogleSheets(updatedLead.leadId, updatedFields, brandConfig.googleAppsScriptUrl);
-    } catch (e) {
-      console.warn('Failed to update walkthrough in Google Sheets:', e);
+  // Convert standalone estimate to a new lead
+  const handleSaveAsNewLead = (
+    estimate: EstimateResult,
+    facilitySpecs: {
+      squareFootage: number;
+      facilityType: FacilitySectorId;
+      cleaningFrequency: FrequencyId;
+      selectedAddOns: AddOnServiceId[];
     }
+  ) => {
+    setInitialSpecsForNewLead({
+      squareFootage: facilitySpecs.squareFootage,
+      facilityType: facilitySpecs.facilityType,
+      cleaningFrequency: facilitySpecs.cleaningFrequency,
+      estimatedValue: estimate.annualContractValue
+    });
+    setIsNewLeadModalOpen(true);
   };
 
   const handleUpdateStatus = async (leadId: string, newStatus: LeadStatus) => {
     const lead = leads.find(l => l.leadId === leadId);
     const prevStatus = lead?.status;
 
-    setLeads(prev => prev.map(l => l.leadId === leadId ? { ...l, status: newStatus, lastUpdated: new Date().toISOString() } : l));
+    setLeads(prev => prev.map(l => l.leadId === leadId ? { 
+      ...l, 
+      status: newStatus, 
+      updatedDate: new Date().toISOString().split('T')[0],
+      lastUpdated: new Date().toISOString() 
+    } : l));
+
     if (activeLead && activeLead.leadId === leadId) {
-      setActiveLead(prev => prev ? { ...prev, status: newStatus, lastUpdated: new Date().toISOString() } : null);
+      setActiveLead(prev => prev ? { 
+        ...prev, 
+        status: newStatus, 
+        updatedDate: new Date().toISOString().split('T')[0],
+        lastUpdated: new Date().toISOString() 
+      } : null);
     }
 
     triggerToast(`Lead ${leadId} status set to ${newStatus}`);
@@ -216,7 +256,7 @@ export const App: React.FC = () => {
 
   const handleSaveProposal = async (proposalInfo: {
     proposalId: string;
-    proposalStatus: 'GENERATED';
+    proposalStatus: ProposalStatus;
     proposalIssueDate: string;
     proposalValidThrough: string;
   }) => {
@@ -224,7 +264,12 @@ export const App: React.FC = () => {
 
     const updatedLead: LeadRecord = {
       ...activeLead,
-      ...proposalInfo,
+      proposalId: proposalInfo.proposalId,
+      proposalStatus: proposalInfo.proposalStatus,
+      proposalIssueDate: proposalInfo.proposalIssueDate,
+      proposalValidThrough: proposalInfo.proposalValidThrough,
+      status: 'Quoted',
+      updatedDate: new Date().toISOString().split('T')[0],
       lastUpdated: new Date().toISOString()
     };
 
@@ -248,10 +293,10 @@ export const App: React.FC = () => {
   const handleOpenEstimatorForLead = (lead: LeadRecord) => {
     setActiveLead(lead);
     const est = lead.estimateSnapshot || calculateCommercialEstimate(
-      lead.squareFootage,
-      lead.facilityType,
-      lead.cleaningFrequency,
-      lead.selectedAddOns
+      lead.squareFootage || 12000,
+      lead.facilityType || 'corporate_office',
+      lead.cleaningFrequency || 'business_5x',
+      lead.selectedAddOns || []
     );
     setActiveEstimate(est);
     setCurrentView('sales');
@@ -265,10 +310,10 @@ export const App: React.FC = () => {
   const handleOpenProposalForLead = (lead: LeadRecord) => {
     setActiveLead(lead);
     const est = lead.estimateSnapshot || calculateCommercialEstimate(
-      lead.squareFootage,
-      lead.facilityType,
-      lead.cleaningFrequency,
-      lead.selectedAddOns
+      lead.squareFootage || 12000,
+      lead.facilityType || 'corporate_office',
+      lead.cleaningFrequency || 'business_5x',
+      lead.selectedAddOns || []
     );
     setActiveEstimate(est);
     setCurrentView('proposal');
@@ -319,7 +364,7 @@ export const App: React.FC = () => {
           </span>
           <button
             onClick={() => setIsProductionPreview(false)}
-            className="text-[11px] underline hover:text-white"
+            className="text-[11px] underline hover:text-white cursor-pointer"
           >
             Back to Loom Pitch Mode
           </button>
@@ -333,7 +378,10 @@ export const App: React.FC = () => {
           onNavigate={(view) => setCurrentView(view)}
           brandConfig={brandConfig}
           isProductionMode={isProductionPreview}
-          onOpenNewLeadModal={() => setIsNewLeadModalOpen(true)}
+          onOpenNewLeadModal={() => {
+            setInitialSpecsForNewLead(undefined);
+            setIsNewLeadModalOpen(true);
+          }}
           leadCount={leads.length}
         />
       )}
@@ -352,23 +400,26 @@ export const App: React.FC = () => {
                 setActiveLead(lead);
                 if (lead.estimateSnapshot) setActiveEstimate(lead.estimateSnapshot);
               }}
-              onOpenNewLeadModal={() => setIsNewLeadModalOpen(true)}
-              onOpenWalkthroughModal={(lead) => {
-                setActiveLead(lead);
-                setIsWalkthroughModalOpen(true);
+              onOpenNewLeadModal={() => {
+                setInitialSpecsForNewLead(undefined);
+                setIsNewLeadModalOpen(true);
+              }}
+              onOpenEditLeadModal={(lead) => {
+                setSelectedLeadForEdit(lead);
+                setIsEditLeadModalOpen(true);
               }}
               onOpenEstimatorForLead={handleOpenEstimatorForLead}
               onOpenProposalForLead={handleOpenProposalForLead}
               onUpdateStatus={handleUpdateStatus}
             />
 
-            {/* Integrated Estimator connected directly to activeLead */}
+            {/* Integrated Estimator (connects to activeLead or operates standalone) */}
             <div className="border-t border-slate-200 pt-4 bg-slate-50/60">
               <CommercialQuoteCalculator
                 brandConfig={brandConfig}
                 activeLead={activeLead}
                 onSaveEstimate={handleSaveEstimate}
-                onScheduleWalkthrough={() => setIsWalkthroughModalOpen(true)}
+                onSaveAsNewLead={handleSaveAsNewLead}
                 onOpenProposalGenerator={handleOpenProposalGenerator}
               />
             </div>
@@ -417,13 +468,19 @@ export const App: React.FC = () => {
         onClose={() => setIsNewLeadModalOpen(false)}
         onCreateLead={handleCreateLead}
         nextLeadSequence={leads.length + 1}
+        initialEstimateSpecs={initialSpecsForNewLead}
       />
 
-      <InternalWalkthroughModal
-        isOpen={isWalkthroughModalOpen}
-        lead={activeLead}
-        onClose={() => setIsWalkthroughModalOpen(false)}
-        onSaveWalkthrough={handleSaveWalkthrough}
+      <LeadDetailEditModal
+        isOpen={isEditLeadModalOpen}
+        lead={selectedLeadForEdit}
+        onClose={() => {
+          setIsEditLeadModalOpen(false);
+          setSelectedLeadForEdit(null);
+        }}
+        onSaveLead={handleUpdateLead}
+        onOpenEstimatorForLead={handleOpenEstimatorForLead}
+        onOpenProposalForLead={handleOpenProposalForLead}
       />
 
       {/* 6. Toast Feedback */}

@@ -251,7 +251,7 @@ export const CorporateLanding: React.FC<CorporateLandingProps> = ({
               How quickly can you commence commercial service once the agreement is authorized?
             </h4>
             <p className="text-slate-600 leading-relaxed">
-              Standard onboarding takes 3 to 5 business days. This allows our operations team to conduct an initial security walkthrough, keycard protocol setup, color-coded chemical supply placement, and dedicated crew orientation.
+              Standard onboarding takes 3 to 5 business days. This allows our operations team to conduct an initial security orientation, keycard protocol setup, color-coded chemical supply placement, and dedicated crew orientation.
             </p>
           </div>
 
@@ -266,10 +266,10 @@ export const CorporateLanding: React.FC<CorporateLandingProps> = ({
 
           <div className="p-5 rounded-xl clean-card">
             <h4 className="font-bold text-slate-900 mb-1.5 text-sm">
-              How does the 15-minute on-site walkthrough work?
+              How does our facility evaluation and quote process work?
             </h4>
             <p className="text-slate-600 leading-relaxed">
-              Our regional operations supervisor will visit your building at your requested time to verify cleanable square footage, flooring compositions, high-traffic restroom banks, and key security doors. Within 24 hours, you receive your formalized Scope of Work agreement.
+              Our regional operations supervisor conducts an evaluation of your building to verify cleanable square footage, flooring compositions, high-traffic restroom banks, and key security doors. Within 24 hours, you receive your formalized Scope of Work proposal.
             </p>
           </div>
         </div>

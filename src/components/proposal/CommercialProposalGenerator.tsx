@@ -7,7 +7,7 @@ import {
   Copy, 
   Check 
 } from 'lucide-react';
-import { EstimateResult, ClientBrandConfig, ProposalData, LeadRecord } from '../../types/cleanCommand';
+import { EstimateResult, ClientBrandConfig, ProposalData, LeadRecord, ProposalStatus } from '../../types/cleanCommand';
 import { facilitySectors, frequencyOptions, addOnServices } from '../../config/clientConfig';
 import { formatCurrency } from '../../utils/pricingEngine';
 import { AlertTriangle } from 'lucide-react';
@@ -17,7 +17,7 @@ interface CommercialProposalGeneratorProps {
   brandConfig: ClientBrandConfig;
   onBack: () => void;
   activeLead?: LeadRecord | null;
-  onSaveProposal?: (proposalInfo: { proposalId: string; proposalStatus: 'GENERATED'; proposalIssueDate: string; proposalValidThrough: string }) => Promise<void> | void;
+  onSaveProposal?: (proposalInfo: { proposalId: string; proposalStatus: ProposalStatus; proposalIssueDate: string; proposalValidThrough: string }) => Promise<void> | void;
 }
 
 export const CommercialProposalGenerator: React.FC<CommercialProposalGeneratorProps> = ({
@@ -31,10 +31,10 @@ export const CommercialProposalGenerator: React.FC<CommercialProposalGeneratorPr
   const [copiedSummary, setCopiedSummary] = useState<boolean>(false);
 
   // Proposal Signer Information (Editable)
-  const [repSignerName, setRepSignerName] = useState<string>(activeLead?.assignedSalesRep || 'Marcus Sterling');
+  const [repSignerName, setRepSignerName] = useState<string>('Marcus Sterling');
   const [repSignerTitle, setRepSignerTitle] = useState<string>('Director of Operations');
 
-  const [clientSignerName, setClientSignerName] = useState<string>(activeLead?.fullName || 'David Vance');
+  const [clientSignerName, setClientSignerName] = useState<string>(activeLead?.contactPerson || activeLead?.fullName || 'David Vance');
   const [clientSignerTitle, setClientSignerTitle] = useState<string>('Director of Facilities');
 
   // Proposal Metadata
@@ -51,11 +51,11 @@ export const CommercialProposalGenerator: React.FC<CommercialProposalGeneratorPr
       proposalId: propId,
       createdDate: createdStr,
       validUntilDate: validStr,
-      clientName: activeLead?.fullName || 'David Vance',
+      clientName: activeLead?.contactPerson || activeLead?.fullName || 'David Vance',
       clientCompany: activeLead?.companyName || 'Commercial Facility Client',
-      clientEmail: activeLead?.businessEmail || 'facilities@clientcompany.com',
-      clientPhone: activeLead?.phoneNumber || '(555) 234-5678',
-      facilityAddress: activeLead?.propertyAddress || `1200 Commerce Blvd, Suite 400, ${brandConfig.primaryCity}`,
+      clientEmail: activeLead?.email || activeLead?.businessEmail || 'facilities@clientcompany.com',
+      clientPhone: activeLead?.phone || activeLead?.phoneNumber || '(555) 234-5678',
+      facilityAddress: activeLead?.projectLocation || activeLead?.propertyAddress || `1200 Commerce Blvd, Suite 400, ${brandConfig.primaryCity}`,
       estimate
     };
   });
@@ -77,7 +77,7 @@ export const CommercialProposalGenerator: React.FC<CommercialProposalGeneratorPr
     if (onSaveProposal) {
       onSaveProposal({
         proposalId: proposalData.proposalId,
-        proposalStatus: 'GENERATED',
+        proposalStatus: 'Sent',
         proposalIssueDate: proposalData.createdDate,
         proposalValidThrough: proposalData.validUntilDate
       });

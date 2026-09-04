@@ -7,14 +7,13 @@ import {
   Clock, 
   Users, 
   ShieldCheck, 
-  ArrowRight, 
   Info, 
   Sliders, 
   Check, 
-  Sparkles,
-  Save,
-  Building2,
-  AlertTriangle
+  Sparkles, 
+  Save, 
+  Building2, 
+  AlertTriangle 
 } from 'lucide-react';
 import { 
   FacilitySectorId, 
@@ -32,7 +31,6 @@ import {
   defaultPricingParameters 
 } from '../../config/clientConfig';
 import { calculateCommercialEstimate, formatCurrency } from '../../utils/pricingEngine';
-import { WalkthroughBookingModal } from './WalkthroughBookingModal';
 
 interface CommercialQuoteCalculatorProps {
   brandConfig: ClientBrandConfig;
@@ -48,7 +46,15 @@ interface CommercialQuoteCalculatorProps {
       selectedAddOns: AddOnServiceId[]; 
     }
   ) => Promise<void> | void;
-  onScheduleWalkthrough?: () => void;
+  onSaveAsNewLead?: (
+    estimate: EstimateResult,
+    facilitySpecs: {
+      squareFootage: number;
+      facilityType: FacilitySectorId;
+      cleaningFrequency: FrequencyId;
+      selectedAddOns: AddOnServiceId[];
+    }
+  ) => void;
 }
 
 export const CommercialQuoteCalculator: React.FC<CommercialQuoteCalculatorProps> = ({
@@ -57,14 +63,13 @@ export const CommercialQuoteCalculator: React.FC<CommercialQuoteCalculatorProps>
   pricingParams = defaultPricingParameters,
   activeLead,
   onSaveEstimate,
-  onScheduleWalkthrough
+  onSaveAsNewLead
 }) => {
   const [squareFootage, setSquareFootage] = useState<number>(activeLead?.squareFootage || 12500);
   const [selectedSectorId, setSelectedSectorId] = useState<FacilitySectorId>(activeLead?.facilityType || 'corporate_office');
   const [selectedFrequencyId, setSelectedFrequencyId] = useState<FrequencyId>(activeLead?.cleaningFrequency || 'business_5x');
   const [selectedAddOns, setSelectedAddOns] = useState<AddOnServiceId[]>(activeLead?.selectedAddOns || ['carpet_extraction']);
   
-  const [isWalkthroughModalOpen, setIsWalkthroughModalOpen] = useState<boolean>(false);
   const [isSavingEstimate, setIsSavingEstimate] = useState<boolean>(false);
   const [justSaved, setJustSaved] = useState<boolean>(false);
   const [validationWarning, setValidationWarning] = useState<string>('');
@@ -157,16 +162,16 @@ export const CommercialQuoteCalculator: React.FC<CommercialQuoteCalculatorProps>
                   {activeLead.status}
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
-                Contact: <strong className="text-slate-200">{activeLead.fullName || 'Unassigned'}</strong> • {activeLead.propertyAddress || brandConfig.primaryCity}
+              <p className="text-xs text-slate-500">
+                Contact: <strong className="text-slate-800">{activeLead.contactPerson || activeLead.fullName || 'Unassigned'}</strong> • {activeLead.projectLocation || activeLead.propertyAddress || brandConfig.primaryCity}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400">Current Saved Rate:</span>
-            <span className="font-mono font-bold text-emerald-400 text-sm">
-              {formatCurrency(activeLead.monthlyEstimate)}/mo
+            <span className="text-xs text-slate-500">Current Saved Rate:</span>
+            <span className="font-mono font-bold text-emerald-700 text-sm">
+              {formatCurrency(activeLead.monthlyEstimate || Math.round((activeLead.estimatedValue || 0) / 12))}/mo
             </span>
           </div>
         </div>
@@ -475,39 +480,34 @@ export const CommercialQuoteCalculator: React.FC<CommercialQuoteCalculatorProps>
                     </>
                   )}
                 </button>
-              ) : (
-                /* Standard Public CTA when no lead is selected */
-                <button
-                  type="button"
-                  onClick={() => setIsWalkthroughModalOpen(true)}
-                  className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-blue-600/30 transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
-                >
-                  <span>Lock In Ballpark &amp; Book Walkthrough</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              )}
-
-              {/* SECONDARY ACTION: Schedule Walkthrough (Optional) */}
-              {activeLead && onScheduleWalkthrough ? (
-                <button
-                  type="button"
-                  onClick={onScheduleWalkthrough}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-100 text-xs font-semibold transition-all cursor-pointer hover:scale-[1.01]"
-                >
-                  <Calendar className="w-4 h-4 text-emerald-400" />
-                  <span>Schedule Walkthrough ({activeLead.walkthroughStatus})</span>
-                </button>
               ) : null}
 
-              {/* TERTIARY ACTION: Generate Professional Proposal */}
+              {/* PRIMARY ACTION: Generate Professional Proposal */}
               <button
                 type="button"
                 onClick={handleProposalClick}
-                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-100 text-xs font-semibold transition-all cursor-pointer hover:scale-[1.01]"
+                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold shadow-sm transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
               >
-                <FileText className="w-4 h-4 text-purple-400" />
+                <FileText className="w-4 h-4" />
                 <span>Generate Professional Proposal Document</span>
               </button>
+
+              {/* OPTIONAL CONVERT WORKFLOW (When in standalone mode) */}
+              {!activeLead && onSaveAsNewLead && (
+                <button
+                  type="button"
+                  onClick={() => onSaveAsNewLead(estimate, {
+                    squareFootage,
+                    facilityType: selectedSectorId,
+                    cleaningFrequency: selectedFrequencyId,
+                    selectedAddOns
+                  })}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold transition-all cursor-pointer shadow-sm hover:border-blue-300"
+                >
+                  <Sparkles className="w-4 h-4 text-blue-600" />
+                  <span>+ Convert Estimate to New Lead</span>
+                </button>
+              )}
             </div>
 
             <div className="mt-4 pt-3 border-t border-slate-800 text-center">
@@ -536,14 +536,6 @@ export const CommercialQuoteCalculator: React.FC<CommercialQuoteCalculatorProps>
         </div>
 
       </div>
-
-      {/* Public Walkthrough Lead Capture Modal (used when public visitors book) */}
-      <WalkthroughBookingModal
-        isOpen={isWalkthroughModalOpen}
-        onClose={() => setIsWalkthroughModalOpen(false)}
-        estimate={estimate}
-        brandConfig={brandConfig}
-      />
     </section>
   );
 };

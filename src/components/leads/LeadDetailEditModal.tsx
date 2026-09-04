@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Building2, 
@@ -7,31 +7,22 @@ import {
   Phone, 
   MapPin, 
   DollarSign, 
-  Sparkles, 
-  AlertCircle, 
-  Briefcase 
+  Sliders, 
+  FileText, 
+  Save, 
+  Briefcase, 
+  CheckCircle2, 
+  AlertCircle 
 } from 'lucide-react';
-import { 
-  LeadRecord, 
-  LeadStatus, 
-  LeadSource,
-  FacilitySectorId,
-  FrequencyId
-} from '../../types/cleanCommand';
-import { facilitySectors, frequencyOptions } from '../../config/clientConfig';
-import { calculateCommercialEstimate } from '../../utils/pricingEngine';
+import { LeadRecord, LeadStatus, LeadSource } from '../../types/cleanCommand';
 
-interface NewLeadModalProps {
+interface LeadDetailEditModalProps {
   isOpen: boolean;
+  lead: LeadRecord | null;
   onClose: () => void;
-  onCreateLead: (lead: LeadRecord) => Promise<void> | void;
-  nextLeadSequence?: number;
-  initialEstimateSpecs?: {
-    squareFootage?: number;
-    facilityType?: FacilitySectorId;
-    cleaningFrequency?: FrequencyId;
-    estimatedValue?: number;
-  };
+  onSaveLead: (updatedLead: LeadRecord) => Promise<void> | void;
+  onOpenEstimatorForLead?: (lead: LeadRecord) => void;
+  onOpenProposalForLead?: (lead: LeadRecord) => void;
 }
 
 const LEAD_STATUS_OPTIONS: LeadStatus[] = [
@@ -53,107 +44,96 @@ const LEAD_SOURCE_OPTIONS: LeadSource[] = [
   'Other'
 ];
 
-export const NewLeadModal: React.FC<NewLeadModalProps> = ({
+export const LeadDetailEditModal: React.FC<LeadDetailEditModalProps> = ({
   isOpen,
+  lead,
   onClose,
-  onCreateLead,
-  nextLeadSequence = 1,
-  initialEstimateSpecs
+  onSaveLead,
+  onOpenEstimatorForLead,
+  onOpenProposalForLead
 }) => {
-  // Required Canonical Lead Fields
-  const [companyName, setCompanyName] = useState('');
-  const [contactPerson, setContactPerson] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [projectName, setProjectName] = useState('');
-  const [projectType, setProjectType] = useState('Commercial Corporate Office');
-  const [projectLocation, setProjectLocation] = useState('');
-  const [estimatedValue, setEstimatedValue] = useState<number>(initialEstimateSpecs?.estimatedValue || 25000);
-  const [leadSource, setLeadSource] = useState<LeadSource>('Website');
-  const [status, setStatus] = useState<LeadStatus>('New');
-  const [notes, setNotes] = useState('');
+  if (!isOpen || !lead) return null;
 
-  // Optional technical specs to connect directly to estimator
-  const [squareFootage, setSquareFootage] = useState<number>(initialEstimateSpecs?.squareFootage || 12000);
-  const [facilityType, setFacilityType] = useState<FacilitySectorId>(initialEstimateSpecs?.facilityType || 'corporate_office');
-  const [cleaningFrequency, setCleaningFrequency] = useState<FrequencyId>(initialEstimateSpecs?.cleaningFrequency || 'business_5x');
+  const [companyName, setCompanyName] = useState(lead.companyName || '');
+  const [contactPerson, setContactPerson] = useState(lead.contactPerson || lead.fullName || '');
+  const [email, setEmail] = useState(lead.email || lead.businessEmail || '');
+  const [phone, setPhone] = useState(lead.phone || lead.phoneNumber || '');
+  const [projectName, setProjectName] = useState(lead.projectName || '');
+  const [projectType, setProjectType] = useState(lead.projectType || 'Commercial Office');
+  const [projectLocation, setProjectLocation] = useState(lead.projectLocation || lead.propertyAddress || '');
+  const [estimatedValue, setEstimatedValue] = useState<number>(lead.estimatedValue || lead.monthlyEstimate || 0);
+  const [leadSource, setLeadSource] = useState<LeadSource>(lead.leadSource || 'Website');
+  const [status, setStatus] = useState<LeadStatus>(lead.status || 'New');
+  const [notes, setNotes] = useState(lead.notes || lead.internalNotes || '');
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
-  if (!isOpen) return null;
-
-  const leadId = `LD-${new Date().getFullYear()}-${String(nextLeadSequence).padStart(3, '0')}`;
+  useEffect(() => {
+    if (lead) {
+      setCompanyName(lead.companyName || '');
+      setContactPerson(lead.contactPerson || lead.fullName || '');
+      setEmail(lead.email || lead.businessEmail || '');
+      setPhone(lead.phone || lead.phoneNumber || '');
+      setProjectName(lead.projectName || '');
+      setProjectType(lead.projectType || 'Commercial Office');
+      setProjectLocation(lead.projectLocation || lead.propertyAddress || '');
+      setEstimatedValue(lead.estimatedValue || lead.monthlyEstimate || 0);
+      setLeadSource(lead.leadSource || 'Website');
+      setStatus(lead.status || 'New');
+      setNotes(lead.notes || lead.internalNotes || '');
+      setErrorMsg('');
+      setSuccessMsg('');
+    }
+  }, [lead?.leadId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+    setSuccessMsg('');
 
     if (!companyName.trim() && !contactPerson.trim()) {
       setErrorMsg('Please provide a Company Name or Contact Person.');
       return;
     }
 
-    setIsSubmitting(true);
+    setIsSaving(true);
     try {
-      const today = new Date().toISOString().split('T')[0];
-
-      // Calculate initial baseline estimate if squareFootage provided
-      const baselineEstimate = calculateCommercialEstimate(
-        squareFootage,
-        facilityType,
-        cleaningFrequency,
-        []
-      );
-
-      const finalEstimatedValue = estimatedValue > 0 
-        ? estimatedValue 
-        : baselineEstimate.annualContractValue;
-
-      const newLead: LeadRecord = {
-        leadId,
-        companyName: companyName.trim() || 'Untitled Prospect',
-        contactPerson: contactPerson.trim() || 'Primary Contact',
+      const updatedLead: LeadRecord = {
+        ...lead,
+        companyName: companyName.trim(),
+        contactPerson: contactPerson.trim(),
         email: email.trim(),
         phone: phone.trim(),
-        projectName: projectName.trim() || `${companyName.trim()} Facility`,
+        projectName: projectName.trim() || companyName.trim(),
         projectType: projectType.trim(),
         projectLocation: projectLocation.trim(),
-        estimatedValue: finalEstimatedValue,
+        estimatedValue: Number(estimatedValue) || 0,
         leadSource,
         status,
         notes: notes.trim(),
-        dateCreated: today,
-        updatedDate: today,
-
-        // Technical estimator connection
-        squareFootage,
-        facilityType,
-        cleaningFrequency,
-        selectedAddOns: [],
-        ratePerVisit: baselineEstimate.pricePerVisit,
-        annualContractValue: finalEstimatedValue,
-        estimatedLaborHours: baselineEstimate.hoursPerCleaningVisit,
-        recommendedCrewSize: baselineEstimate.recommendedCrewSize,
-        estimateSnapshot: baselineEstimate,
+        updatedDate: new Date().toISOString().split('T')[0],
 
         // Sync compatibility helpers
-        fullName: contactPerson.trim() || 'Primary Contact',
+        fullName: contactPerson.trim(),
         businessEmail: email.trim(),
         phoneNumber: phone.trim(),
         propertyAddress: projectLocation.trim(),
         internalNotes: notes.trim(),
-        monthlyEstimate: Math.round(finalEstimatedValue / 12),
-        createdDate: today,
+        monthlyEstimate: Math.round((Number(estimatedValue) || 0) / 12) || lead.monthlyEstimate || 0,
         lastUpdated: new Date().toISOString()
       };
 
-      await onCreateLead(newLead);
-      onClose();
+      await onSaveLead(updatedLead);
+      setSuccessMsg('Lead record updated successfully!');
+      setTimeout(() => {
+        onClose();
+      }, 700);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to create lead. Please try again.');
+      setErrorMsg(err.message || 'Failed to update lead. Please try again.');
     } finally {
-      setIsSubmitting(false);
+      setIsSaving(false);
     }
   };
 
@@ -164,17 +144,19 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 bg-slate-50 border-b border-slate-200">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 font-bold">
-              <Sparkles className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-700 font-bold">
+              <Briefcase className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-slate-900 tracking-tight">Create New Lead</h2>
+                <h2 className="text-lg font-bold text-slate-900 tracking-tight">Lead Record Details</h2>
                 <span className="font-mono text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">
-                  {leadId}
+                  {lead.leadId}
                 </span>
               </div>
-              <p className="text-xs text-slate-500">Add a new prospect to your sales pipeline and Google Sheets database</p>
+              <p className="text-xs text-slate-500">
+                Created on {lead.dateCreated || lead.createdDate || 'Recent'} • Last updated {lead.updatedDate || 'Today'}
+              </p>
             </div>
           </div>
           <button
@@ -186,6 +168,39 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
           </button>
         </div>
 
+        {/* Action Shortcuts Bar */}
+        <div className="bg-slate-50/70 border-b border-slate-200 px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+          <span className="text-slate-600 font-medium">Quick Workflows:</span>
+          <div className="flex items-center gap-2">
+            {onOpenEstimatorForLead && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenEstimatorForLead(lead);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-all cursor-pointer shadow-sm"
+              >
+                <Sliders className="w-3.5 h-3.5" />
+                <span>Create / Adjust Estimate</span>
+              </button>
+            )}
+            {onOpenProposalForLead && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenProposalForLead(lead);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 font-semibold transition-all cursor-pointer shadow-sm"
+              >
+                <FileText className="w-3.5 h-3.5 text-purple-600" />
+                <span>Generate Proposal</span>
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           {errorMsg && (
@@ -195,10 +210,17 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
             </div>
           )}
 
-          {/* Section 1: Prospect & Company */}
+          {successMsg && (
+            <div className="flex items-center gap-2 p-3 text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl">
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+              <span>{successMsg}</span>
+            </div>
+          )}
+
+          {/* Section 1: Company & Contact */}
           <div>
             <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700 block mb-3">
-              1. Prospect & Company (Required)
+              Prospect Identification
             </span>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -208,7 +230,6 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Apex Health Center"
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
                     className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 shadow-sm"
@@ -222,7 +243,6 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
                   <User className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
                   <input
                     type="text"
-                    placeholder="e.g. Sarah Jenkins"
                     value={contactPerson}
                     onChange={(e) => setContactPerson(e.target.value)}
                     className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 shadow-sm"
@@ -236,7 +256,6 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
                   <Mail className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
                   <input
                     type="email"
-                    placeholder="contact@company.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm"
@@ -250,7 +269,6 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
                   <Phone className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
                   <input
                     type="tel"
-                    placeholder="(555) 000-0000"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm"
@@ -263,28 +281,23 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
           {/* Section 2: Project Scope & Location */}
           <div>
             <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700 block mb-3">
-              2. Project Scope & Location
+              Project & Facility Details
             </span>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Project Name</label>
-                <div className="relative">
-                  <Briefcase className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="e.g. Headquarters Facility Janitorial"
-                    value={projectName}
-                    onChange={(e) => setProjectName(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm"
-                  />
-                </div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Project / Facility Name</label>
+                <input
+                  type="text"
+                  value={projectName}
+                  onChange={(e) => setProjectName(e.target.value)}
+                  className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 shadow-sm"
+                />
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Project Type</label>
                 <input
                   type="text"
-                  placeholder="e.g. Commercial Office, Medical Facility..."
                   value={projectType}
                   onChange={(e) => setProjectType(e.target.value)}
                   className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 shadow-sm"
@@ -298,7 +311,6 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
                 <MapPin className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="e.g. 100 Technology Blvd, Suite 200, Dallas, TX"
                   value={projectLocation}
                   onChange={(e) => setProjectLocation(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm"
@@ -307,10 +319,10 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
             </div>
           </div>
 
-          {/* Section 3: Status, Estimated Value, and Lead Source */}
+          {/* Section 3: Status & Value */}
           <div>
             <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700 block mb-3">
-              3. Status, Value & Source
+              Pipeline Status & Value
             </span>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
@@ -335,7 +347,7 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
                   <input
                     type="number"
                     min="0"
-                    step="500"
+                    step="100"
                     value={estimatedValue}
                     onChange={(e) => setEstimatedValue(Number(e.target.value))}
                     className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 shadow-sm font-mono"
@@ -362,72 +374,12 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
             <div className="mt-3">
               <label className="block text-xs font-semibold text-slate-700 mb-1">Notes</label>
               <textarea
-                rows={2}
-                placeholder="Initial conversation notes, requirements, or client preferences..."
+                rows={3}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
+                placeholder="Conversation history, client preferences, special facility requirements..."
                 className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 resize-none shadow-sm"
               />
-            </div>
-          </div>
-
-          {/* Section 4: Estimator Technical Specs (Pre-connects to Quote Engine) */}
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-3">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 block">
-              Estimator Pre-Configuration (Optional)
-            </span>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-[11px] font-medium text-slate-600 mb-1">Facility Sector</label>
-                <select
-                  value={facilityType}
-                  onChange={(e) => setFacilityType(e.target.value as FacilitySectorId)}
-                  className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-blue-600"
-                >
-                  {facilitySectors.map((sector) => (
-                    <option key={sector.id} value={sector.id}>
-                      {sector.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-medium text-slate-600 mb-1">Square Footage</label>
-                <input
-                  type="number"
-                  min="500"
-                  step="500"
-                  value={squareFootage}
-                  onChange={(e) => {
-                    const sqft = Number(e.target.value);
-                    setSquareFootage(sqft);
-                    const calc = calculateCommercialEstimate(sqft, facilityType, cleaningFrequency, []);
-                    setEstimatedValue(calc.annualContractValue);
-                  }}
-                  className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-blue-600 font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-medium text-slate-600 mb-1">Cleaning Frequency</label>
-                <select
-                  value={cleaningFrequency}
-                  onChange={(e) => {
-                    const freq = e.target.value as FrequencyId;
-                    setCleaningFrequency(freq);
-                    const calc = calculateCommercialEstimate(squareFootage, facilityType, freq, []);
-                    setEstimatedValue(calc.annualContractValue);
-                  }}
-                  className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-blue-600"
-                >
-                  {frequencyOptions.map((freq) => (
-                    <option key={freq.id} value={freq.id}>
-                      {freq.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
             </div>
           </div>
 
@@ -442,18 +394,18 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSaving}
               className="px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl shadow-sm transition-all flex items-center gap-2 cursor-pointer"
             >
-              {isSubmitting ? (
+              {isSaving ? (
                 <>
                   <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Saving to Google Sheets...
+                  Saving Lead...
                 </>
               ) : (
                 <>
-                  <Sparkles className="w-4 h-4" />
-                  Create Lead
+                  <Save className="w-4 h-4" />
+                  Save Changes
                 </>
               )}
             </button>
