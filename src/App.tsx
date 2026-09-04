@@ -44,7 +44,11 @@ export const App: React.FC = () => {
     try {
       const saved = localStorage.getItem('cleancommand_brand_config');
       if (saved) {
-        return { ...defaultClientBrand, ...JSON.parse(saved) };
+        const parsed = JSON.parse(saved);
+        if (!parsed.googleAppsScriptUrl || typeof parsed.googleAppsScriptUrl !== 'string' || parsed.googleAppsScriptUrl.trim() === '') {
+          parsed.googleAppsScriptUrl = defaultClientBrand.googleAppsScriptUrl;
+        }
+        return { ...defaultClientBrand, ...parsed };
       }
     } catch (e) {
       console.warn('LocalStorage unavailable for brand config:', e);

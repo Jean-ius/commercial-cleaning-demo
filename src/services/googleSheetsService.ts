@@ -2,13 +2,20 @@ import { LeadRecord, LeadStatus } from '../types/cleanCommand';
 
 const LOCAL_STORAGE_LEADS_KEY = 'cleancommand_leads_cache';
 
+export const CANONICAL_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxP_7JM9DiCjbIMurFqbhVjFIgt8egv4OLgEe_FmhCGegoUC2ZF5g4lFYTlH3ew-yCnng/exec';
+
 /**
  * Helper to resolve the active Webhook URL
  */
 function resolveWebhookUrl(overrideUrl?: string): string {
+  if (overrideUrl && overrideUrl.trim().length > 0) {
+    return overrideUrl.trim();
+  }
   const envUrl = (import.meta as { env?: Record<string, string> }).env?.VITE_GOOGLE_APPS_SCRIPT_URL;
-  const target = (overrideUrl && overrideUrl.trim().length > 0) ? overrideUrl.trim() : envUrl;
-  return target ? target.trim() : '';
+  if (envUrl && envUrl.trim().length > 0) {
+    return envUrl.trim();
+  }
+  return CANONICAL_APPS_SCRIPT_URL;
 }
 
 interface WebhookResponse {
