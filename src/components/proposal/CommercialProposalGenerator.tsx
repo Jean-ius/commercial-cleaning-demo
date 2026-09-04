@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Printer, 
   ArrowLeft, 
@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { EstimateResult, ClientBrandConfig, ProposalData, LeadRecord, ProposalStatus } from '../../types/cleanCommand';
 import { facilitySectors, frequencyOptions, addOnServices } from '../../config/clientConfig';
-import { formatCurrency } from '../../utils/pricingEngine';
+import { calculateCommercialEstimate, formatCurrency } from '../../utils/pricingEngine';
 import { AlertTriangle } from 'lucide-react';
 
 interface CommercialProposalGeneratorProps {
@@ -18,6 +18,7 @@ interface CommercialProposalGeneratorProps {
   onBack: () => void;
   activeLead?: LeadRecord | null;
   onSaveProposal?: (proposalInfo: { proposalId: string; proposalStatus: ProposalStatus; proposalIssueDate: string; proposalValidThrough: string }) => Promise<void> | void;
+  onUpdateAdjustment?: (newAdjustment: number) => void;
 }
 
 export const CommercialProposalGenerator: React.FC<CommercialProposalGeneratorProps> = ({
@@ -25,10 +26,41 @@ export const CommercialProposalGenerator: React.FC<CommercialProposalGeneratorPr
   brandConfig,
   onBack,
   activeLead,
-  onSaveProposal
+  onSaveProposal,
+  onUpdateAdjustment
 }) => {
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [copiedSummary, setCopiedSummary] = useState<boolean>(false);
+
+  // Live Discretionary Adjustment synchronized with Proposal Document (Requirement 3)
+  const [localAdjustment, setLocalAdjustment] = useState<number>(
+    estimate.discretionaryAdjustmentPercent ?? 0
+  );
+
+  useEffect(() => {
+    setLocalAdjustment(estimate.discretionaryAdjustmentPercent ?? 0);
+  }, [estimate.discretionaryAdjustmentPercent]);
+
+  const currentEstimate = useMemo(() => {
+    if (localAdjustment === (estimate.discretionaryAdjustmentPercent ?? 0)) {
+      return estimate;
+    }
+    return calculateCommercialEstimate(
+      estimate.squareFootage,
+      estimate.sectorId,
+      estimate.frequencyId,
+      estimate.selectedAddOns,
+      undefined,
+      localAdjustment
+    );
+  }, [estimate, localAdjustment]);
+
+  const handleSliderChange = (val: number) => {
+    setLocalAdjustment(val);
+    if (onUpdateAdjustment) {
+      onUpdateAdjustment(val);
+    }
+  };
 
   // Proposal Signer Information (Editable)
   const [repSignerName, setRepSignerName] = useState<string>('Marcus Sterling');
@@ -56,7 +88,7 @@ export const CommercialProposalGenerator: React.FC<CommercialProposalGeneratorPr
       clientEmail: activeLead?.email || activeLead?.businessEmail || 'facilities@clientcompany.com',
       clientPhone: activeLead?.phone || activeLead?.phoneNumber || '(555) 234-5678',
       facilityAddress: activeLead?.projectLocation || activeLead?.propertyAddress || `1200 Commerce Blvd, Suite 400, ${brandConfig.primaryCity}`,
-      estimate
+      estimate: currentEstimate
     };
   });
 
@@ -67,11 +99,11 @@ export const CommercialProposalGenerator: React.FC<CommercialProposalGeneratorPr
   if (!proposalData.clientEmail.trim()) missingFields.push('Business Email');
   if (!proposalData.clientPhone.trim()) missingFields.push('Phone Number');
   if (!proposalData.facilityAddress.trim()) missingFields.push('Property Address');
-  if (!estimate.squareFootage || estimate.squareFootage <= 0) missingFields.push('Square Footage');
-  if (!estimate.totalEstimatedMonthlyInvestment || estimate.totalEstimatedMonthlyInvestment <= 0) missingFields.push('Saved Monthly Estimate');
+  if (!currentEstimate.squareFootage || currentEstimate.squareFootage <= 0) missingFields.push('Square Footage');
+  if (!currentEstimate.totalEstimatedMonthlyInvestment || currentEstimate.totalEstimatedMonthlyInvestment <= 0) missingFields.push('Saved Monthly Estimate');
 
-  const sector = facilitySectors.find(s => s.id === estimate.sectorId) || facilitySectors[0];
-  const frequency = frequencyOptions.find(f => f.id === estimate.frequencyId) || frequencyOptions[1];
+  const sector = facilitySectors.find(s => s.id === currentEstimate.sectorId) || facilitySectors[0];
+  const frequency = frequencyOptions.find(f => f.id === currentEstimate.frequencyId) || frequencyOptions[1];
 
   const handlePrint = () => {
     if (onSaveProposal) {
@@ -90,10 +122,10 @@ export const CommercialProposalGenerator: React.FC<CommercialProposalGeneratorPr
 Service Provider: ${brandConfig.companyName}
 Reference ID: ${proposalData.proposalId}
 Prepared For: ${proposalData.clientName} | ${proposalData.clientCompany}
-Facility: ${estimate.squareFootage.toLocaleString()} sq ft • ${sector.name}
+Facility: ${currentEstimate.squareFootage.toLocaleString()} sq ft • ${sector.name}
 Schedule: ${frequency.label} (${frequency.sublabel})
-Monthly Investment: ${formatCurrency(estimate.totalEstimatedMonthlyInvestment)} / month ($${estimate.pricePerVisit} / visit)
-Annual Contract Value: ${formatCurrency(estimate.annualContractValue)}
+Monthly Investment: ${formatCurrency(currentEstimate.totalEstimatedMonthlyInvestment)} / month ($${currentEstimate.pricePerVisit} / visit)
+Annual Contract Value: ${formatCurrency(currentEstimate.annualContractValue)}
 Insurance & Compliance: ${brandConfig.insuranceCoverage}
 Guaranteed SLA: ${brandConfig.qualitySla || '4-Hour Prompt Re-Clean Guarantee'}`;
 
@@ -128,7 +160,6 @@ Guaranteed SLA: ${brandConfig.qualitySla || '4-Hour Prompt Re-Clean Guarantee'}`
         </div>
       )}
 
-      
       {/* Top Action Toolbar (Hidden on Print) */}
       <div className="max-w-[794px] mx-auto mb-4 flex flex-wrap items-center justify-between gap-3 bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm print:hidden">
         <button
@@ -138,6 +169,39 @@ Guaranteed SLA: ${brandConfig.qualitySla || '4-Hour Prompt Re-Clean Guarantee'}`
           <ArrowLeft className="w-4 h-4" />
           <span>Back to Estimator</span>
         </button>
+
+        {/* Live Discretionary Adjustment Slider in Proposal Studio Toolbar (Requirement 3) */}
+        <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
+          <span className="text-[11px] font-bold text-slate-700 whitespace-nowrap flex items-center gap-1">
+            <span>Price Adj:</span>
+          </span>
+          <input
+            id="proposal-adjustment-slider"
+            type="range"
+            min="-20"
+            max="20"
+            step="0.5"
+            value={localAdjustment}
+            onChange={(e) => {
+              const raw = parseFloat(e.target.value);
+              const clean = Number.isFinite(raw) ? Math.min(20, Math.max(-20, raw)) : 0;
+              handleSliderChange(clean);
+            }}
+            className="w-24 sm:w-28 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+            title="Adjust final proposed price live on proposal document"
+          />
+          <span 
+            className={`text-[11px] font-mono font-bold px-1.5 py-0.5 rounded ${
+              localAdjustment > 0 
+                ? 'bg-emerald-100 text-emerald-800' 
+                : localAdjustment < 0 
+                  ? 'bg-amber-100 text-amber-800' 
+                  : 'bg-slate-200 text-slate-700'
+            }`}
+          >
+            {localAdjustment > 0 ? '+' : ''}{localAdjustment.toFixed(1)}%
+          </span>
+        </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <button
@@ -276,13 +340,13 @@ Guaranteed SLA: ${brandConfig.qualitySla || '4-Hour Prompt Re-Clean Guarantee'}`
             </span>
             <div className="space-y-0.5 text-xs">
               <p className="text-slate-900 font-bold">
-                {estimate.squareFootage.toLocaleString()} sq ft <span className="font-normal text-slate-400">•</span> {sector.name}
+                {currentEstimate.squareFootage.toLocaleString()} sq ft <span className="font-normal text-slate-400">•</span> {sector.name}
               </p>
               <p className="text-slate-700 font-medium text-[11px]">
                 Cleaning Schedule: <strong className="text-slate-900 font-semibold">{frequency.label}</strong> ({frequency.sublabel})
               </p>
               <p className="text-slate-400 text-[10px] pt-0.5">
-                Staffing Benchmark: {estimate.hoursPerCleaningVisit} hrs / visit • {estimate.recommendedCrewSize} Dedicated Cleaner{estimate.recommendedCrewSize > 1 ? 's' : ''}
+                Staffing Benchmark: {currentEstimate.hoursPerCleaningVisit} hrs / visit • {currentEstimate.recommendedCrewSize} Dedicated Cleaner{currentEstimate.recommendedCrewSize > 1 ? 's' : ''}
               </p>
             </div>
           </div>
@@ -344,11 +408,11 @@ Guaranteed SLA: ${brandConfig.qualitySla || '4-Hour Prompt Re-Clean Guarantee'}`
           </div>
 
           {/* Periodic Specialty Services (Compact Single Row) */}
-          {estimate.selectedAddOns.length > 0 && (
+          {currentEstimate.selectedAddOns.length > 0 && (
             <div className="pt-1.5 pb-1 flex items-center justify-between text-xs border-t border-slate-100">
               <span className="text-[11px] text-slate-700">
                 <strong className="text-slate-950 font-bold uppercase text-[10px] tracking-wider mr-1.5">Included Periodic Services:</strong>
-                {estimate.selectedAddOns.map(id => addOnServices.find(a => a.id === id)?.name).filter(Boolean).join(' • ')}
+                {currentEstimate.selectedAddOns.map((id: string) => addOnServices.find(a => a.id === id)?.name).filter(Boolean).join(' • ')}
               </span>
               <span className="text-[10px] font-mono font-bold text-emerald-700 uppercase bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 shrink-0">
                 Included in Monthly Rate
@@ -381,7 +445,7 @@ Guaranteed SLA: ${brandConfig.qualitySla || '4-Hour Prompt Re-Clean Guarantee'}`
 
             <div className="text-right">
               <span className="text-3xl font-black text-slate-950 font-mono tracking-tight">
-                {formatCurrency(estimate.totalEstimatedMonthlyInvestment)}
+                {formatCurrency(currentEstimate.totalEstimatedMonthlyInvestment)}
               </span>
               <span className="text-xs font-bold text-slate-700"> / month</span>
             </div>
@@ -391,15 +455,15 @@ Guaranteed SLA: ${brandConfig.qualitySla || '4-Hour Prompt Re-Clean Guarantee'}`
           <div className="grid grid-cols-3 gap-4 pt-1 text-center text-xs">
             <div className="py-1 border-r border-slate-200">
               <span className="block text-slate-500 text-[10px] uppercase font-bold tracking-wider">Rate Per Visit</span>
-              <strong className="text-slate-950 font-mono text-sm font-black">{formatCurrency(estimate.pricePerVisit)}</strong>
+              <strong className="text-slate-950 font-mono text-sm font-black">{formatCurrency(currentEstimate.pricePerVisit)}</strong>
             </div>
             <div className="py-1 border-r border-slate-200">
               <span className="block text-slate-500 text-[10px] uppercase font-bold tracking-wider">Monthly Visits</span>
-              <strong className="text-slate-950 font-mono text-sm font-black">{estimate.cleaningVisitsPerMonth} Visits / mo</strong>
+              <strong className="text-slate-950 font-mono text-sm font-black">{currentEstimate.cleaningVisitsPerMonth} Visits / mo</strong>
             </div>
             <div className="py-1">
               <span className="block text-slate-500 text-[10px] uppercase font-bold tracking-wider">Annual Contract Value</span>
-              <strong className="text-slate-950 font-mono text-sm font-black">{formatCurrency(estimate.annualContractValue)}</strong>
+              <strong className="text-slate-950 font-mono text-sm font-black">{formatCurrency(currentEstimate.annualContractValue)}</strong>
             </div>
           </div>
         </div>

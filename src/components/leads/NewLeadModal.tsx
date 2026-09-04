@@ -36,6 +36,8 @@ interface NewLeadModalProps {
     estimatedValue?: number;
     monthlyEstimate?: number;
     ratePerVisit?: number;
+    discretionaryAdjustmentPercent?: number;
+    recommendedMonthlyRate?: number;
     selectedAddOns?: AddOnServiceId[];
     propertyType?: string;
     specialRequirements?: string;
@@ -204,6 +206,13 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
         annualContractValue: finalEstimatedValue,
         estimatedLaborHours: baselineEstimate.hoursPerCleaningVisit,
         recommendedCrewSize: baselineEstimate.recommendedCrewSize,
+        discretionaryAdjustmentPercent: initialEstimateSpecs?.discretionaryAdjustmentPercent ?? initialEstimateSpecs?.estimateSnapshot?.discretionaryAdjustmentPercent ?? 0,
+        recommendedMonthlyRate: initialEstimateSpecs?.recommendedMonthlyRate ?? initialEstimateSpecs?.estimateSnapshot?.recommendedMonthlyRate,
+        recommendedPricePerVisit: initialEstimateSpecs?.estimateSnapshot?.recommendedPricePerVisit,
+        recommendedAnnualContractValue: initialEstimateSpecs?.estimateSnapshot?.recommendedAnnualContractValue,
+        finalProposedMonthlyRate: initialEstimateSpecs?.monthlyEstimate ?? initialEstimateSpecs?.estimateSnapshot?.finalProposedMonthlyRate,
+        finalProposedPricePerVisit: initialEstimateSpecs?.ratePerVisit ?? initialEstimateSpecs?.estimateSnapshot?.finalProposedPricePerVisit,
+        finalProposedAnnualContractValue: finalEstimatedValue,
         estimateSnapshot: initialEstimateSpecs?.estimateSnapshot 
           ? { ...initialEstimateSpecs.estimateSnapshot, annualContractValue: finalEstimatedValue }
           : (finalEstimatedValue > 0 ? { ...baselineEstimate, annualContractValue: finalEstimatedValue } : undefined),

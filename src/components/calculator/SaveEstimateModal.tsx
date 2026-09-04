@@ -138,9 +138,20 @@ export const SaveEstimateModal: React.FC<SaveEstimateModalProps> = ({
           {/* Current Estimate Snapshot Badge */}
           <div className="mt-3 p-3 rounded-2xl bg-slate-900 text-white flex items-center justify-between shadow-inner">
             <div>
-              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
-                Calculated Estimate
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
+                  Final Proposed Price
+                </span>
+                {estimate.discretionaryAdjustmentPercent !== 0 && (
+                  <span className={`text-[10px] font-mono font-black px-1.5 py-0.2 rounded border ${
+                    estimate.discretionaryAdjustmentPercent > 0
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                      : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                  }`}>
+                    {estimate.discretionaryAdjustmentPercent > 0 ? '+' : ''}{estimate.discretionaryAdjustmentPercent.toFixed(1)}%
+                  </span>
+                )}
+              </div>
               <span className="text-base font-mono font-extrabold text-emerald-400">
                 {formatCurrency(estimate.totalEstimatedMonthlyInvestment)}
                 <span className="text-xs text-slate-300 font-sans font-normal">/mo</span>

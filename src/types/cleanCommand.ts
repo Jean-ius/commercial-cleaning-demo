@@ -84,6 +84,15 @@ export interface EstimateResult {
   totalEstimatedMonthlyInvestment: number;
   annualContractValue: number;
   
+  // Discretionary Pricing Adjustment (Strictly applied after base cost & margin calculations)
+  recommendedMonthlyRate: number;
+  recommendedPricePerVisit: number;
+  recommendedAnnualContractValue: number;
+  discretionaryAdjustmentPercent: number;
+  finalProposedMonthlyRate: number;
+  finalProposedPricePerVisit: number;
+  finalProposedAnnualContractValue: number;
+
   // Contract Range (Low-High for ballpark presentation)
   lowMonthlyRange: number;
   highMonthlyRange: number;
@@ -153,6 +162,13 @@ export interface LeadRecord {
   annualContractValue?: number;
   estimatedLaborHours?: number;
   recommendedCrewSize?: number;
+  discretionaryAdjustmentPercent?: number;
+  recommendedMonthlyRate?: number;
+  recommendedPricePerVisit?: number;
+  recommendedAnnualContractValue?: number;
+  finalProposedMonthlyRate?: number;
+  finalProposedPricePerVisit?: number;
+  finalProposedAnnualContractValue?: number;
   estimateSnapshot?: EstimateResult;
 
   // Proposal Connection

@@ -31,7 +31,8 @@ export function calculateCommercialEstimate(
   sectorId: FacilitySectorId,
   frequencyId: FrequencyId,
   selectedAddOns: AddOnServiceId[] = [],
-  customPricing: PricingParameters = defaultPricingParameters
+  customPricing: PricingParameters = defaultPricingParameters,
+  discretionaryAdjustmentPercent: number = 0
 ): EstimateResult {
   // 1. Resolve Sector and Frequency Settings
   const sector = facilitySectors.find(s => s.id === sectorId) || facilitySectors[0];
@@ -74,10 +75,27 @@ export function calculateCommercialEstimate(
     }
   });
   
-  const totalEstimatedMonthlyInvestment = baseMonthlyRate + addOnMonthlyTotal;
-  const annualContractValue = totalEstimatedMonthlyInvestment * 12;
-  
-  // 7. Ballpark Range (+/- 7% variance for site contingency)
+  // Base Model Calculated Selling Prices (BEFORE Discretionary Adjustment)
+  const recommendedMonthlyRate = baseMonthlyRate + addOnMonthlyTotal;
+  const recommendedPricePerVisit = pricePerVisit;
+  const recommendedAnnualContractValue = recommendedMonthlyRate * 12;
+
+  // Discretionary Pricing Adjustment (Strictly applied after base cost & margin calculations)
+  const safeAdjustmentPercent = Number.isFinite(discretionaryAdjustmentPercent)
+    ? Math.min(20, Math.max(-20, discretionaryAdjustmentPercent))
+    : 0;
+  const adjustmentFactor = 1 + (safeAdjustmentPercent / 100);
+
+  // Final Proposed Pricing
+  const finalProposedMonthlyRate = Math.round(recommendedMonthlyRate * adjustmentFactor);
+  const finalProposedPricePerVisit = Math.round(recommendedPricePerVisit * adjustmentFactor);
+  const finalProposedAnnualContractValue = finalProposedMonthlyRate * 12;
+
+  // Dependent Values
+  const totalEstimatedMonthlyInvestment = finalProposedMonthlyRate;
+  const annualContractValue = finalProposedAnnualContractValue;
+
+  // 7. Ballpark Range (+/- 7% variance for site contingency based on final proposed price)
   const lowMonthlyRange = Math.round(totalEstimatedMonthlyInvestment * 0.93);
   const highMonthlyRange = Math.round(totalEstimatedMonthlyInvestment * 1.07);
   
@@ -94,11 +112,21 @@ export function calculateCommercialEstimate(
     directLaborCostPerVisit: Math.round(directLaborCostPerVisit),
     directSuppliesCostPerVisit: Math.round(directSuppliesCostPerVisit),
     baseCostPerVisit: Math.round(baseCostPerVisit),
-    pricePerVisit,
+    pricePerVisit: finalProposedPricePerVisit,
     baseMonthlyRate,
     addOnMonthlyRate: addOnMonthlyTotal,
     totalEstimatedMonthlyInvestment,
     annualContractValue,
+    
+    // Discretionary Pricing Adjustment Fields
+    recommendedMonthlyRate,
+    recommendedPricePerVisit,
+    recommendedAnnualContractValue,
+    discretionaryAdjustmentPercent: safeAdjustmentPercent,
+    finalProposedMonthlyRate,
+    finalProposedPricePerVisit,
+    finalProposedAnnualContractValue,
+
     lowMonthlyRange,
     highMonthlyRange
   };

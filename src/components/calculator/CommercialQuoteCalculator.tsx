@@ -89,6 +89,10 @@ export const CommercialQuoteCalculator: React.FC<CommercialQuoteCalculatorProps>
   const [selectedFrequencyId, setSelectedFrequencyId] = useState<FrequencyId>(activeLead?.cleaningFrequency || 'business_5x');
   const [selectedAddOns, setSelectedAddOns] = useState<AddOnServiceId[]>(activeLead?.selectedAddOns || ['carpet_extraction']);
   
+  const [discretionaryAdjustment, setDiscretionaryAdjustment] = useState<number>(() => {
+    return activeLead?.discretionaryAdjustmentPercent ?? activeLead?.estimateSnapshot?.discretionaryAdjustmentPercent ?? 0;
+  });
+  
   const [isSavingEstimate, setIsSavingEstimate] = useState<boolean>(false);
   const [justSaved, setJustSaved] = useState<boolean>(false);
   const [validationWarning, setValidationWarning] = useState<string>('');
@@ -101,19 +105,26 @@ export const CommercialQuoteCalculator: React.FC<CommercialQuoteCalculatorProps>
       setSelectedSectorId(activeLead.facilityType || 'corporate_office');
       setSelectedFrequencyId(activeLead.cleaningFrequency || 'business_5x');
       setSelectedAddOns(activeLead.selectedAddOns || []);
+      setDiscretionaryAdjustment(
+        activeLead.discretionaryAdjustmentPercent ?? activeLead.estimateSnapshot?.discretionaryAdjustmentPercent ?? 0
+      );
+    } else {
+      // Clean reset for New Blank Estimate (Requirement 4 & 8)
+      setDiscretionaryAdjustment(0);
     }
   }, [activeLead?.leadId]);
 
-  // Calculate live estimate
+  // Calculate live estimate (strictly applying discretionary adjustment after recommended price)
   const estimate = useMemo(() => {
     return calculateCommercialEstimate(
       squareFootage,
       selectedSectorId,
       selectedFrequencyId,
       selectedAddOns,
-      pricingParams
+      pricingParams,
+      discretionaryAdjustment
     );
-  }, [squareFootage, selectedSectorId, selectedFrequencyId, selectedAddOns, pricingParams]);
+  }, [squareFootage, selectedSectorId, selectedFrequencyId, selectedAddOns, pricingParams, discretionaryAdjustment]);
 
   const activeSector = facilitySectors.find(s => s.id === selectedSectorId) || facilitySectors[0];
 
@@ -178,7 +189,10 @@ export const CommercialQuoteCalculator: React.FC<CommercialQuoteCalculatorProps>
             {onClearActiveLead && (
               <button
                 type="button"
-                onClick={onClearActiveLead}
+                onClick={() => {
+                  setDiscretionaryAdjustment(0);
+                  onClearActiveLead();
+                }}
                 className="text-xs font-semibold px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 shadow-sm"
                 title="Disconnect current lead and start a new blank estimate for another company"
               >
@@ -398,9 +412,104 @@ export const CommercialQuoteCalculator: React.FC<CommercialQuoteCalculatorProps>
               </div>
             </div>
 
-            {/* Big Numbers */}
-            <div className="py-6 border-b border-slate-700/80">
-              <div className="flex items-baseline gap-2">
+            {/* 1. Base Calculated Selling Price (Model Recommended) */}
+            <div className="pt-4 pb-3 border-b border-slate-800/80 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold block">
+                  RECOMMENDED PRICE
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  Model baseline ({activeSector.name})
+                </span>
+              </div>
+              <div className="text-right">
+                <span className="text-base sm:text-lg font-bold font-mono text-slate-200 tabular-nums">
+                  {formatCurrency(estimate.recommendedMonthlyRate)}
+                </span>
+                <span className="text-xs text-slate-400 font-sans ml-1">/ month</span>
+              </div>
+            </div>
+
+            {/* 2. DISCRETIONARY PRICING ADJUSTMENT Slider Control */}
+            <div className="py-4 border-b border-slate-800/80 space-y-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <label 
+                  htmlFor="discretionary-pricing-slider" 
+                  className="text-[10px] font-mono uppercase tracking-wider text-blue-400 font-extrabold flex items-center gap-1.5"
+                >
+                  <Sliders className="w-3.5 h-3.5" />
+                  <span>DISCRETIONARY PRICING ADJUSTMENT</span>
+                </label>
+
+                {/* Exact active percentage badge */}
+                <div className="flex items-center gap-2">
+                  <span 
+                    id="discretionary-percentage-badge"
+                    className={`font-mono text-xs font-black px-2.5 py-0.5 rounded-lg border tabular-nums transition-colors ${
+                      discretionaryAdjustment > 0
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-xs'
+                        : discretionaryAdjustment < 0
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-xs'
+                          : 'bg-slate-800 text-slate-300 border-slate-700'
+                    }`}
+                  >
+                    {discretionaryAdjustment > 0 ? '+' : ''}{discretionaryAdjustment.toFixed(1)}%
+                  </span>
+                  {discretionaryAdjustment !== 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setDiscretionaryAdjustment(0)}
+                      className="text-[10px] text-slate-400 hover:text-white underline cursor-pointer transition-colors"
+                      title="Reset adjustment to 0%"
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Polished Range Slider (-20% to +20%, step 0.5%) */}
+              <div className="space-y-1.5 pt-1">
+                <input
+                  id="discretionary-pricing-slider"
+                  type="range"
+                  min="-20"
+                  max="20"
+                  step="0.5"
+                  value={discretionaryAdjustment}
+                  onChange={(e) => {
+                    const rawVal = parseFloat(e.target.value);
+                    const cleanVal = Number.isFinite(rawVal) ? Math.min(20, Math.max(-20, rawVal)) : 0;
+                    setDiscretionaryAdjustment(cleanVal);
+                  }}
+                  className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400 transition-all"
+                  aria-label="Discretionary pricing adjustment percentage"
+                />
+
+                {/* Preset notch ticks */}
+                <div className="flex justify-between text-[10px] font-mono text-slate-400 px-0.5 select-none">
+                  {[-20, -10, -5, 0, 5, 10, 20].map((tick) => (
+                    <button
+                      key={tick}
+                      type="button"
+                      onClick={() => setDiscretionaryAdjustment(tick)}
+                      className={`hover:text-white transition-colors cursor-pointer py-0.5 ${
+                        discretionaryAdjustment === tick ? 'text-blue-400 font-bold' : ''
+                      }`}
+                    >
+                      {tick > 0 ? `+${tick}%` : `${tick}%`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* 3. FINAL PROPOSED PRICE (Hero Centerpiece) */}
+            <div className="py-5 border-b border-slate-700/80">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-400 font-extrabold block">
+                FINAL PROPOSED PRICE
+              </span>
+              <div className="flex items-baseline gap-2 mt-1">
                 <span className="text-3xl sm:text-4xl font-extrabold text-white font-mono tracking-tight transition-all duration-150 tabular-nums">
                   {formatCurrency(estimate.totalEstimatedMonthlyInvestment)}
                 </span>

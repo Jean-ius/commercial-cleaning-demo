@@ -647,6 +647,9 @@ function doPost(e) {
 
       // Log activity
       if (logSheet) {
+        var adjText = (data.discretionaryAdjustmentPercent !== undefined && data.discretionaryAdjustmentPercent !== 0)
+          ? " [Adj: " + (Number(data.discretionaryAdjustmentPercent) > 0 ? "+" : "") + data.discretionaryAdjustmentPercent + "%]"
+          : "";
         logSheet.appendRow([
           "ACT-" + Date.now().toString(36).toUpperCase(),
           leadId,
@@ -655,7 +658,7 @@ function doPost(e) {
           "",
           data.status || "New",
           data.assignedSalesRep || "System",
-          "Created lead record for " + (data.companyName || "Prospect") + " ($" + monthlyVal + "/mo)"
+          "Created lead record for " + (data.companyName || "Prospect") + " ($" + monthlyVal + "/mo" + adjText + ")"
         ]);
         var logIdx = logSheet.getLastRow();
         logSheet.getRange(logIdx, 1, 1, ACTIVITY_LOG_HEADERS.length)
@@ -929,6 +932,9 @@ function doPost(e) {
 
       // 9. Activity log
       if (logSheet) {
+        var adjNote = (data.discretionaryAdjustmentPercent !== undefined && data.discretionaryAdjustmentPercent !== 0)
+          ? " [Adj: " + (Number(data.discretionaryAdjustmentPercent) > 0 ? "+" : "") + data.discretionaryAdjustmentPercent + "%]"
+          : "";
         logSheet.appendRow([
           "ACT-" + Date.now().toString(36).toUpperCase(),
           eLeadId,
@@ -937,7 +943,7 @@ function doPost(e) {
           "",
           data.status || "Estimating",
           "Estimator",
-          "Commercial cleaning estimate saved ($" + (saveMonthly || 0) + "/mo, $" + (saveAnnual || 0) + "/yr, $" + (saveRate || 0) + "/visit)"
+          "Commercial cleaning estimate saved ($" + (saveMonthly || 0) + "/mo" + adjNote + ", $" + (saveAnnual || 0) + "/yr, $" + (saveRate || 0) + "/visit)"
         ]);
       }
 
@@ -949,6 +955,8 @@ function doPost(e) {
           monthlyEstimate: saveMonthly,
           estimatedValue: saveAnnual,
           ratePerVisit: saveRate,
+          discretionaryAdjustmentPercent: data.discretionaryAdjustmentPercent !== undefined ? Number(data.discretionaryAdjustmentPercent) : 0,
+          recommendedMonthlyRate: data.recommendedMonthlyRate !== undefined ? Number(data.recommendedMonthlyRate) : saveMonthly,
           lastUpdated: todayStr
         }
       })).setMimeType(ContentService.MimeType.JSON);
