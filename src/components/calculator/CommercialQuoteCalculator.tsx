@@ -413,6 +413,21 @@ export const CommercialQuoteCalculator: React.FC<CommercialQuoteCalculatorProps>
                   Ballpark range: <strong className="text-white tabular-nums">{formatCurrency(estimate.lowMonthlyRange)}</strong> – <strong className="text-white tabular-nums">{formatCurrency(estimate.highMonthlyRange)}/mo</strong>
                 </span>
               </p>
+
+              {/* FINAL CONTRACT VALUE Badge */}
+              <div className="mt-4 pt-3.5 border-t border-slate-800/80 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-blue-400 font-bold block">
+                    FINAL CONTRACT VALUE
+                  </span>
+                  <span className="text-2xl sm:text-3xl font-black text-emerald-400 font-mono tabular-nums">
+                    {formatCurrency(estimate.annualContractValue)}
+                  </span>
+                </div>
+                <span className="text-[11px] text-slate-400 font-sans">
+                  Annual 12-Month Total
+                </span>
+              </div>
             </div>
 
             {/* Operational Specs Grid */}

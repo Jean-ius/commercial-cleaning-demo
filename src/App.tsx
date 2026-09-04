@@ -659,7 +659,10 @@ export const App: React.FC = () => {
       {/* 5. Modals */}
       <NewLeadModal
         isOpen={isNewLeadModalOpen}
-        onClose={() => setIsNewLeadModalOpen(false)}
+        onClose={() => {
+          setIsNewLeadModalOpen(false);
+          setInitialSpecsForNewLead(undefined);
+        }}
         onCreateLead={handleCreateLead}
         suggestedLeadId={generateNextLeadId()}
         initialEstimateSpecs={initialSpecsForNewLead}
