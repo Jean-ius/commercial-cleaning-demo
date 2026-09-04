@@ -72,6 +72,8 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
   const [leadSource, setLeadSource] = useState<LeadSource>('Website');
   const [status, setStatus] = useState<LeadStatus>('New');
   const [notes, setNotes] = useState('');
+  const [specialRequirements, setSpecialRequirements] = useState('');
+  const [assignedSalesRep, setAssignedSalesRep] = useState('Unassigned');
 
   // Optional technical specs to connect directly to estimator
   const [squareFootage, setSquareFootage] = useState<number>(initialEstimateSpecs?.squareFootage || 12000);
@@ -112,46 +114,49 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
 
       const newLead: LeadRecord = {
         leadId,
+        leadSource,
         companyName: companyName.trim() || 'Untitled Prospect',
         contactPerson: contactPerson.trim() || 'Primary Contact',
         email: email.trim(),
         phone: phone.trim(),
-        projectName: projectName.trim() || `${companyName.trim()} Facility`,
+        propertyAddress: projectLocation.trim(),
+        propertyType: projectType.trim(),
         projectType: projectType.trim(),
-        projectLocation: projectLocation.trim(),
-        estimatedValue: finalEstimatedValue,
-        leadSource,
+        squareFootage,
+        cleaningFrequency,
+        specialRequirements: specialRequirements.trim(),
+        assignedSalesRep: assignedSalesRep.trim() || 'Unassigned',
         status,
         notes: notes.trim(),
         dateCreated: today,
-        updatedDate: today,
+        lastUpdated: today,
 
-        // Technical estimator connection
-        squareFootage,
+        // Legacy / Estimator connection fields
+        projectName: projectName.trim() || `${companyName.trim()} Facility`,
+        projectLocation: projectLocation.trim(),
+        estimatedValue: finalEstimatedValue,
         facilityType,
-        cleaningFrequency,
         selectedAddOns: [],
         ratePerVisit: baselineEstimate.pricePerVisit,
         annualContractValue: finalEstimatedValue,
         estimatedLaborHours: baselineEstimate.hoursPerCleaningVisit,
         recommendedCrewSize: baselineEstimate.recommendedCrewSize,
         estimateSnapshot: baselineEstimate,
+        updatedDate: today,
 
         // Sync compatibility helpers
         fullName: contactPerson.trim() || 'Primary Contact',
         businessEmail: email.trim(),
         phoneNumber: phone.trim(),
-        propertyAddress: projectLocation.trim(),
         internalNotes: notes.trim(),
         monthlyEstimate: Math.round(finalEstimatedValue / 12),
-        createdDate: today,
-        lastUpdated: new Date().toISOString()
+        createdDate: today
       };
 
       await onCreateLead(newLead);
       onClose();
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to create lead. Please try again.');
+      setErrorMsg(err.message || 'Failed to create lead. Please check network/Apps Script and try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -359,11 +364,34 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
               </div>
             </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Assigned Sales Rep</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Marcus Vance / CleanCommand Sales"
+                  value={assignedSalesRep}
+                  onChange={(e) => setAssignedSalesRep(e.target.value)}
+                  className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 shadow-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Special Requirements</label>
+                <input
+                  type="text"
+                  placeholder="e.g. HEPA filtration, biohazard protocol, after-hours key access..."
+                  value={specialRequirements}
+                  onChange={(e) => setSpecialRequirements(e.target.value)}
+                  className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 shadow-sm"
+                />
+              </div>
+            </div>
+
             <div className="mt-3">
               <label className="block text-xs font-semibold text-slate-700 mb-1">Notes</label>
               <textarea
                 rows={2}
-                placeholder="Initial conversation notes, requirements, or client preferences..."
+                placeholder="Initial conversation notes, client preferences..."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 resize-none shadow-sm"

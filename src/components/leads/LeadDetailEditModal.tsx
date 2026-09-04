@@ -65,6 +65,10 @@ export const LeadDetailEditModal: React.FC<LeadDetailEditModalProps> = ({
   const [leadSource, setLeadSource] = useState<LeadSource>(lead.leadSource || 'Website');
   const [status, setStatus] = useState<LeadStatus>(lead.status || 'New');
   const [notes, setNotes] = useState(lead.notes || lead.internalNotes || '');
+  const [specialRequirements, setSpecialRequirements] = useState(lead.specialRequirements || '');
+  const [assignedSalesRep, setAssignedSalesRep] = useState(lead.assignedSalesRep || 'Unassigned');
+  const [squareFootage, setSquareFootage] = useState<number>(lead.squareFootage || 12000);
+  const [cleaningFrequency, setCleaningFrequency] = useState<string>(lead.cleaningFrequency || 'business_5x');
 
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -77,12 +81,16 @@ export const LeadDetailEditModal: React.FC<LeadDetailEditModalProps> = ({
       setEmail(lead.email || lead.businessEmail || '');
       setPhone(lead.phone || lead.phoneNumber || '');
       setProjectName(lead.projectName || '');
-      setProjectType(lead.projectType || 'Commercial Office');
+      setProjectType(lead.projectType || lead.propertyType || 'Commercial Office');
       setProjectLocation(lead.projectLocation || lead.propertyAddress || '');
       setEstimatedValue(lead.estimatedValue || lead.monthlyEstimate || 0);
       setLeadSource(lead.leadSource || 'Website');
       setStatus(lead.status || 'New');
       setNotes(lead.notes || lead.internalNotes || '');
+      setSpecialRequirements(lead.specialRequirements || '');
+      setAssignedSalesRep(lead.assignedSalesRep || 'Unassigned');
+      setSquareFootage(lead.squareFootage || 12000);
+      setCleaningFrequency(lead.cleaningFrequency || 'business_5x');
       setErrorMsg('');
       setSuccessMsg('');
     }
@@ -100,38 +108,45 @@ export const LeadDetailEditModal: React.FC<LeadDetailEditModalProps> = ({
 
     setIsSaving(true);
     try {
+      const today = new Date().toISOString().split('T')[0];
       const updatedLead: LeadRecord = {
         ...lead,
+        leadSource,
         companyName: companyName.trim(),
         contactPerson: contactPerson.trim(),
         email: email.trim(),
         phone: phone.trim(),
-        projectName: projectName.trim() || companyName.trim(),
-        projectType: projectType.trim(),
-        projectLocation: projectLocation.trim(),
-        estimatedValue: Number(estimatedValue) || 0,
-        leadSource,
+        propertyAddress: projectLocation.trim(),
+        propertyType: projectType.trim(),
+        squareFootage: Number(squareFootage) || 0,
+        cleaningFrequency: cleaningFrequency as any,
+        specialRequirements: specialRequirements.trim(),
+        assignedSalesRep: assignedSalesRep.trim() || 'Unassigned',
         status,
         notes: notes.trim(),
-        updatedDate: new Date().toISOString().split('T')[0],
+        lastUpdated: today,
+
+        // Estimator & Proposal connections
+        projectName: projectName.trim() || companyName.trim(),
+        projectLocation: projectLocation.trim(),
+        estimatedValue: Number(estimatedValue) || 0,
+        updatedDate: today,
 
         // Sync compatibility helpers
         fullName: contactPerson.trim(),
         businessEmail: email.trim(),
         phoneNumber: phone.trim(),
-        propertyAddress: projectLocation.trim(),
         internalNotes: notes.trim(),
-        monthlyEstimate: Math.round((Number(estimatedValue) || 0) / 12) || lead.monthlyEstimate || 0,
-        lastUpdated: new Date().toISOString()
+        monthlyEstimate: Math.round((Number(estimatedValue) || 0) / 12) || lead.monthlyEstimate || 0
       };
 
       await onSaveLead(updatedLead);
-      setSuccessMsg('Lead record updated successfully!');
+      setSuccessMsg('Lead record updated and synchronized to Google Sheet!');
       setTimeout(() => {
         onClose();
-      }, 700);
+      }, 800);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to update lead. Please try again.');
+      setErrorMsg(err.message || 'Failed to update lead in Google Sheet. Please check network/Apps Script.');
     } finally {
       setIsSaving(false);
     }
@@ -368,6 +383,53 @@ export const LeadDetailEditModal: React.FC<LeadDetailEditModalProps> = ({
                     </option>
                   ))}
                 </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Assigned Sales Rep</label>
+                <input
+                  type="text"
+                  value={assignedSalesRep}
+                  onChange={(e) => setAssignedSalesRep(e.target.value)}
+                  placeholder="e.g. Marcus Vance"
+                  className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 shadow-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Special Requirements</label>
+                <input
+                  type="text"
+                  value={specialRequirements}
+                  onChange={(e) => setSpecialRequirements(e.target.value)}
+                  placeholder="e.g. HEPA filtration, after-hours security badge..."
+                  className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 shadow-sm"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Square Footage</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="500"
+                  value={squareFootage}
+                  onChange={(e) => setSquareFootage(Number(e.target.value))}
+                  className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 shadow-sm font-mono"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Cleaning Frequency</label>
+                <input
+                  type="text"
+                  value={cleaningFrequency}
+                  onChange={(e) => setCleaningFrequency(e.target.value)}
+                  placeholder="e.g. business_5x, daily_7x, weekly_1x"
+                  className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 shadow-sm"
+                />
               </div>
             </div>
 

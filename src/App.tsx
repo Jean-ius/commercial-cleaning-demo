@@ -124,6 +124,10 @@ export const App: React.FC = () => {
 
   // Lead Lifecycle Actions
   const handleCreateLead = async (newLead: LeadRecord) => {
+    // 1. Send to Google Sheets first (Persistent Company Data Store)
+    await createLeadInGoogleSheets(newLead, brandConfig.googleAppsScriptUrl);
+
+    // 2. Only after Google Sheets write succeeds: update UI & local state
     setLeads(prev => [newLead, ...prev]);
     setActiveLead(newLead);
     if (newLead.estimateSnapshot) {
@@ -131,24 +135,36 @@ export const App: React.FC = () => {
     }
     triggerToast(`Created lead ${newLead.leadId} for ${newLead.companyName}!`);
 
+    // 3. Reconcile from Google Sheets to confirm full database parity
     try {
-      await createLeadInGoogleSheets(newLead, brandConfig.googleAppsScriptUrl);
-    } catch (e) {
-      console.warn('Failed to sync new lead to Google Sheets:', e);
+      const fresh = await loadLeadsFromGoogleSheets(brandConfig.googleAppsScriptUrl);
+      if (fresh.leads && fresh.leads.length > 0) {
+        setLeads(fresh.leads);
+      }
+    } catch {
+      // background reconcile non-fatal
     }
   };
 
   const handleUpdateLead = async (updatedLead: LeadRecord) => {
+    // 1. Send update to Google Sheets first
+    await updateLeadInGoogleSheets(updatedLead, brandConfig.googleAppsScriptUrl);
+
+    // 2. Only after Google Sheets write succeeds: update UI & local state
     setLeads(prev => prev.map(l => l.leadId === updatedLead.leadId ? updatedLead : l));
     if (activeLead && activeLead.leadId === updatedLead.leadId) {
       setActiveLead(updatedLead);
     }
-    triggerToast(`Updated lead ${updatedLead.leadId} (${updatedLead.companyName})!`);
+    triggerToast(`Updated lead ${updatedLead.leadId} (${updatedLead.companyName}) in Google Sheets!`);
 
+    // 3. Reconcile from Google Sheets
     try {
-      await updateLeadInGoogleSheets(updatedLead, brandConfig.googleAppsScriptUrl);
-    } catch (e) {
-      console.warn('Failed to sync lead update to Google Sheets:', e);
+      const fresh = await loadLeadsFromGoogleSheets(brandConfig.googleAppsScriptUrl);
+      if (fresh.leads && fresh.leads.length > 0) {
+        setLeads(fresh.leads);
+      }
+    } catch {
+      // background reconcile non-fatal
     }
   };
 
@@ -177,16 +193,11 @@ export const App: React.FC = () => {
       estimateSnapshot: estimate,
       status: activeLead.status === 'New' ? 'Estimating' : activeLead.status,
       updatedDate: new Date().toISOString().split('T')[0],
+      lastUpdated: new Date().toISOString().split('T')[0],
 
       // Compatibility helpers
-      monthlyEstimate: estimate.totalEstimatedMonthlyInvestment,
-      lastUpdated: new Date().toISOString()
+      monthlyEstimate: estimate.totalEstimatedMonthlyInvestment
     };
-
-    setActiveLead(updatedLead);
-    setActiveEstimate(estimate);
-    setLeads(prev => prev.map(l => l.leadId === updatedLead.leadId ? updatedLead : l));
-    triggerToast(`Saved estimate ($${estimate.totalEstimatedMonthlyInvestment}/mo) to ${updatedLead.companyName}!`);
 
     try {
       await saveEstimateToGoogleSheets(updatedLead.leadId, {
@@ -199,10 +210,16 @@ export const App: React.FC = () => {
         squareFootage: facilitySpecs.squareFootage,
         facilityType: facilitySpecs.facilityType,
         cleaningFrequency: facilitySpecs.cleaningFrequency,
-        selectedAddOns: facilitySpecs.selectedAddOns
+        selectedAddOns: facilitySpecs.selectedAddOns,
+        status: updatedLead.status
       }, brandConfig.googleAppsScriptUrl);
-    } catch (e) {
-      console.warn('Failed to save estimate to Google Sheets:', e);
+
+      setActiveLead(updatedLead);
+      setActiveEstimate(estimate);
+      setLeads(prev => prev.map(l => l.leadId === updatedLead.leadId ? updatedLead : l));
+      triggerToast(`Saved estimate ($${estimate.totalEstimatedMonthlyInvestment}/mo) to ${updatedLead.companyName}!`);
+    } catch (e: any) {
+      triggerToast(`Failed to save estimate to Google Sheets: ${e?.message || 'Error'}`);
     }
   };
 
@@ -229,28 +246,28 @@ export const App: React.FC = () => {
     const lead = leads.find(l => l.leadId === leadId);
     const prevStatus = lead?.status;
 
-    setLeads(prev => prev.map(l => l.leadId === leadId ? { 
-      ...l, 
-      status: newStatus, 
-      updatedDate: new Date().toISOString().split('T')[0],
-      lastUpdated: new Date().toISOString() 
-    } : l));
-
-    if (activeLead && activeLead.leadId === leadId) {
-      setActiveLead(prev => prev ? { 
-        ...prev, 
-        status: newStatus, 
-        updatedDate: new Date().toISOString().split('T')[0],
-        lastUpdated: new Date().toISOString() 
-      } : null);
-    }
-
-    triggerToast(`Lead ${leadId} status set to ${newStatus}`);
-
     try {
       await updateStatusInGoogleSheets(leadId, newStatus, prevStatus, brandConfig.googleAppsScriptUrl);
-    } catch (e) {
-      console.warn('Failed to update status in Google Sheets:', e);
+
+      setLeads(prev => prev.map(l => l.leadId === leadId ? { 
+        ...l, 
+        status: newStatus, 
+        updatedDate: new Date().toISOString().split('T')[0],
+        lastUpdated: new Date().toISOString().split('T')[0] 
+      } : l));
+
+      if (activeLead && activeLead.leadId === leadId) {
+        setActiveLead(prev => prev ? { 
+          ...prev, 
+          status: newStatus, 
+          updatedDate: new Date().toISOString().split('T')[0],
+          lastUpdated: new Date().toISOString().split('T')[0] 
+        } : null);
+      }
+
+      triggerToast(`Lead ${leadId} status set to ${newStatus} in Google Sheets!`);
+    } catch (e: any) {
+      triggerToast(`Failed to update status in Google Sheets: ${e?.message || 'Error'}`);
     }
   };
 

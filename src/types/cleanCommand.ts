@@ -167,11 +167,13 @@ export interface LeadRecord {
   businessEmail?: string;
   phoneNumber?: string;
   propertyAddress?: string;
+  propertyType?: string;
   monthlyEstimate?: number;
   createdDate?: string;
   lastUpdated?: string;
   internalNotes?: string;
   specialRequirements?: string;
+  assignedSalesRep?: string;
 }
 
 export interface ProposalData {
