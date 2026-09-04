@@ -61,13 +61,13 @@ export const LeadDetailEditModal: React.FC<LeadDetailEditModalProps> = ({
   const [projectName, setProjectName] = useState(lead.projectName || '');
   const [projectType, setProjectType] = useState(lead.projectType || 'Commercial Office');
   const [projectLocation, setProjectLocation] = useState(lead.projectLocation || lead.propertyAddress || '');
-  const [estimatedValue, setEstimatedValue] = useState<number>(lead.estimatedValue || lead.monthlyEstimate || 0);
+  const [estimatedValue, setEstimatedValue] = useState<number | string>(lead.estimatedValue ?? lead.annualContractValue ?? 0);
   const [leadSource, setLeadSource] = useState<LeadSource>(lead.leadSource || 'Website');
   const [status, setStatus] = useState<LeadStatus>(lead.status || 'New');
   const [notes, setNotes] = useState(lead.notes || lead.internalNotes || '');
   const [specialRequirements, setSpecialRequirements] = useState(lead.specialRequirements || '');
   const [assignedSalesRep, setAssignedSalesRep] = useState(lead.assignedSalesRep || 'Unassigned');
-  const [squareFootage, setSquareFootage] = useState<number>(lead.squareFootage || 12000);
+  const [squareFootage, setSquareFootage] = useState<number | string>(lead.squareFootage || 12000);
   const [cleaningFrequency, setCleaningFrequency] = useState<string>(lead.cleaningFrequency || 'business_5x');
 
   const [isSaving, setIsSaving] = useState(false);
@@ -83,7 +83,7 @@ export const LeadDetailEditModal: React.FC<LeadDetailEditModalProps> = ({
       setProjectName(lead.projectName || '');
       setProjectType(lead.projectType || lead.propertyType || 'Commercial Office');
       setProjectLocation(lead.projectLocation || lead.propertyAddress || '');
-      setEstimatedValue(lead.estimatedValue || lead.monthlyEstimate || 0);
+      setEstimatedValue(lead.estimatedValue ?? lead.annualContractValue ?? 0);
       setLeadSource(lead.leadSource || 'Website');
       setStatus(lead.status || 'New');
       setNotes(lead.notes || lead.internalNotes || '');
@@ -109,6 +109,13 @@ export const LeadDetailEditModal: React.FC<LeadDetailEditModalProps> = ({
     setIsSaving(true);
     try {
       const today = new Date().toISOString().split('T')[0];
+      const numEstimatedValue = typeof estimatedValue === 'number' 
+        ? estimatedValue 
+        : parseFloat(String(estimatedValue)) || 0;
+      const numSquareFootage = typeof squareFootage === 'number' 
+        ? squareFootage 
+        : parseFloat(String(squareFootage)) || 0;
+
       const updatedLead: LeadRecord = {
         ...lead,
         leadSource,
@@ -118,7 +125,7 @@ export const LeadDetailEditModal: React.FC<LeadDetailEditModalProps> = ({
         phone: phone.trim(),
         propertyAddress: projectLocation.trim(),
         propertyType: projectType.trim(),
-        squareFootage: Number(squareFootage) || 0,
+        squareFootage: numSquareFootage,
         cleaningFrequency: cleaningFrequency as any,
         specialRequirements: specialRequirements.trim(),
         assignedSalesRep: assignedSalesRep.trim() || 'Unassigned',
@@ -129,7 +136,8 @@ export const LeadDetailEditModal: React.FC<LeadDetailEditModalProps> = ({
         // Estimator & Proposal connections
         projectName: projectName.trim() || companyName.trim(),
         projectLocation: projectLocation.trim(),
-        estimatedValue: Number(estimatedValue) || 0,
+        estimatedValue: numEstimatedValue,
+        annualContractValue: numEstimatedValue,
         updatedDate: today,
 
         // Sync compatibility helpers
@@ -137,7 +145,7 @@ export const LeadDetailEditModal: React.FC<LeadDetailEditModalProps> = ({
         businessEmail: email.trim(),
         phoneNumber: phone.trim(),
         internalNotes: notes.trim(),
-        monthlyEstimate: Math.round((Number(estimatedValue) || 0) / 12) || lead.monthlyEstimate || 0
+        monthlyEstimate: Math.round(numEstimatedValue / 12) || lead.monthlyEstimate || 0
       };
 
       await onSaveLead(updatedLead);
@@ -362,9 +370,9 @@ export const LeadDetailEditModal: React.FC<LeadDetailEditModalProps> = ({
                   <input
                     type="number"
                     min="0"
-                    step="100"
+                    step="any"
                     value={estimatedValue}
-                    onChange={(e) => setEstimatedValue(Number(e.target.value))}
+                    onChange={(e) => setEstimatedValue(e.target.value)}
                     className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 shadow-sm font-mono"
                   />
                 </div>
@@ -415,9 +423,9 @@ export const LeadDetailEditModal: React.FC<LeadDetailEditModalProps> = ({
                 <input
                   type="number"
                   min="0"
-                  step="500"
+                  step="any"
                   value={squareFootage}
-                  onChange={(e) => setSquareFootage(Number(e.target.value))}
+                  onChange={(e) => setSquareFootage(e.target.value)}
                   className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 shadow-sm font-mono"
                 />
               </div>

@@ -79,7 +79,9 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
   const [projectName, setProjectName] = useState('');
   const [projectType, setProjectType] = useState(initialEstimateSpecs?.propertyType || 'Commercial Corporate Office');
   const [projectLocation, setProjectLocation] = useState('');
-  const [estimatedValue, setEstimatedValue] = useState<number>(initialEstimateSpecs?.estimatedValue || 25000);
+  const [estimatedValue, setEstimatedValue] = useState<number | string>(
+    initialEstimateSpecs?.estimatedValue !== undefined ? initialEstimateSpecs.estimatedValue : 25000
+  );
   const [leadSource, setLeadSource] = useState<LeadSource>('Website');
   const [status, setStatus] = useState<LeadStatus>(initialEstimateSpecs ? 'Estimating' : 'New');
   const [notes, setNotes] = useState(initialEstimateSpecs?.notes || '');
@@ -87,7 +89,7 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
   const [assignedSalesRep, setAssignedSalesRep] = useState('Unassigned');
 
   // Optional technical specs to connect directly to estimator
-  const [squareFootage, setSquareFootage] = useState<number>(initialEstimateSpecs?.squareFootage || 12000);
+  const [squareFootage, setSquareFootage] = useState<number | string>(initialEstimateSpecs?.squareFootage || 12000);
   const [facilityType, setFacilityType] = useState<FacilitySectorId>(initialEstimateSpecs?.facilityType || 'corporate_office');
   const [cleaningFrequency, setCleaningFrequency] = useState<FrequencyId>(initialEstimateSpecs?.cleaningFrequency || 'business_5x');
 
@@ -140,17 +142,25 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
     try {
       const today = new Date().toISOString().split('T')[0];
 
+      const numSquareFootage = typeof squareFootage === 'number' 
+        ? squareFootage 
+        : parseFloat(String(squareFootage)) || 0;
+
       // Use attached estimate snapshot if available, or calculate baseline
       const baselineEstimate = initialEstimateSpecs?.estimateSnapshot || calculateCommercialEstimate(
-        squareFootage,
+        numSquareFootage || 12000,
         facilityType,
         cleaningFrequency,
         initialEstimateSpecs?.selectedAddOns || []
       );
 
-      const finalEstimatedValue = estimatedValue > 0 
+      const numEstimatedValue = typeof estimatedValue === 'number' 
         ? estimatedValue 
-        : baselineEstimate.annualContractValue;
+        : parseFloat(String(estimatedValue)) || 0;
+
+      const finalEstimatedValue = numEstimatedValue > 0 
+        ? numEstimatedValue 
+        : (initialEstimateSpecs?.estimatedValue ?? baselineEstimate.annualContractValue);
 
       const newLead: LeadRecord = {
         leadId,
@@ -162,7 +172,7 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
         propertyAddress: projectLocation.trim(),
         propertyType: projectType.trim(),
         projectType: projectType.trim(),
-        squareFootage,
+        squareFootage: numSquareFootage,
         cleaningFrequency,
         specialRequirements: specialRequirements.trim(),
         assignedSalesRep: assignedSalesRep.trim() || 'Unassigned',
@@ -181,7 +191,7 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
         annualContractValue: finalEstimatedValue,
         estimatedLaborHours: baselineEstimate.hoursPerCleaningVisit,
         recommendedCrewSize: baselineEstimate.recommendedCrewSize,
-        estimateSnapshot: baselineEstimate,
+        estimateSnapshot: { ...baselineEstimate, annualContractValue: finalEstimatedValue },
         updatedDate: today,
 
         // Sync compatibility helpers
@@ -189,7 +199,7 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
         businessEmail: email.trim(),
         phoneNumber: phone.trim(),
         internalNotes: notes.trim(),
-        monthlyEstimate: initialEstimateSpecs?.monthlyEstimate || Math.round(finalEstimatedValue / 12),
+        monthlyEstimate: initialEstimateSpecs?.monthlyEstimate || (finalEstimatedValue > 0 ? Math.round(finalEstimatedValue / 12) : 0),
         createdDate: today
       };
 
@@ -380,9 +390,9 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
                   <input
                     type="number"
                     min="0"
-                    step="500"
+                    step="any"
                     value={estimatedValue}
-                    onChange={(e) => setEstimatedValue(Number(e.target.value))}
+                    onChange={(e) => setEstimatedValue(e.target.value)}
                     className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 shadow-sm font-mono"
                   />
                 </div>
@@ -449,7 +459,15 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
                 <label className="block text-[11px] font-medium text-slate-600 mb-1">Facility Sector</label>
                 <select
                   value={facilityType}
-                  onChange={(e) => setFacilityType(e.target.value as FacilitySectorId)}
+                  onChange={(e) => {
+                    const sector = e.target.value as FacilitySectorId;
+                    setFacilityType(sector);
+                    const numSqft = typeof squareFootage === 'number' ? squareFootage : parseFloat(String(squareFootage)) || 0;
+                    if (numSqft > 0) {
+                      const calc = calculateCommercialEstimate(numSqft, sector, cleaningFrequency, []);
+                      setEstimatedValue(calc.annualContractValue);
+                    }
+                  }}
                   className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-blue-600"
                 >
                   {facilitySectors.map((sector) => (
@@ -464,14 +482,17 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
                 <label className="block text-[11px] font-medium text-slate-600 mb-1">Square Footage</label>
                 <input
                   type="number"
-                  min="500"
-                  step="500"
+                  min="1"
+                  step="any"
                   value={squareFootage}
                   onChange={(e) => {
-                    const sqft = Number(e.target.value);
-                    setSquareFootage(sqft);
-                    const calc = calculateCommercialEstimate(sqft, facilityType, cleaningFrequency, []);
-                    setEstimatedValue(calc.annualContractValue);
+                    const val = e.target.value;
+                    setSquareFootage(val);
+                    const sqft = parseFloat(val) || 0;
+                    if (sqft > 0) {
+                      const calc = calculateCommercialEstimate(sqft, facilityType, cleaningFrequency, []);
+                      setEstimatedValue(calc.annualContractValue);
+                    }
                   }}
                   className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-blue-600 font-mono"
                 />
@@ -484,8 +505,11 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
                   onChange={(e) => {
                     const freq = e.target.value as FrequencyId;
                     setCleaningFrequency(freq);
-                    const calc = calculateCommercialEstimate(squareFootage, facilityType, freq, []);
-                    setEstimatedValue(calc.annualContractValue);
+                    const numSqft = typeof squareFootage === 'number' ? squareFootage : parseFloat(String(squareFootage)) || 0;
+                    if (numSqft > 0) {
+                      const calc = calculateCommercialEstimate(numSqft, facilityType, freq, []);
+                      setEstimatedValue(calc.annualContractValue);
+                    }
                   }}
                   className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-blue-600"
                 >

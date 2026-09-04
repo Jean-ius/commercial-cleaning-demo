@@ -250,8 +250,8 @@ export const CommercialQuoteCalculator: React.FC<CommercialQuoteCalculatorProps>
               <div className="flex items-center gap-1 min-w-[140px] px-3 py-1.5 rounded-xl border border-slate-300 bg-white shadow-inner">
                 <input
                   type="number"
-                  min="500"
-                  step="500"
+                  min="1"
+                  step="any"
                   value={squareFootage}
                   onChange={(e) => setSquareFootage(Math.max(0, Number(e.target.value)))}
                   className="w-full font-mono text-sm font-bold text-slate-900 text-right focus:outline-none"

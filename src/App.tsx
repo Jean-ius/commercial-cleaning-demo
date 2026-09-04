@@ -197,12 +197,13 @@ export const App: React.FC = () => {
 
     // 3. If an estimate was attached, save estimate specifically with the confirmed Lead ID
     if (newLead.estimateSnapshot) {
+      const finalAnnualVal = newLead.estimatedValue || newLead.annualContractValue || newLead.estimateSnapshot.annualContractValue;
       try {
         await saveEstimateToGoogleSheets(confirmedLeadId, {
-          estimatedValue: newLead.estimateSnapshot.annualContractValue,
-          monthlyEstimate: newLead.estimateSnapshot.totalEstimatedMonthlyInvestment,
-          ratePerVisit: newLead.estimateSnapshot.pricePerVisit,
-          annualContractValue: newLead.estimateSnapshot.annualContractValue,
+          estimatedValue: finalAnnualVal,
+          monthlyEstimate: newLead.monthlyEstimate || newLead.estimateSnapshot.totalEstimatedMonthlyInvestment,
+          ratePerVisit: newLead.ratePerVisit || newLead.estimateSnapshot.pricePerVisit,
+          annualContractValue: finalAnnualVal,
           estimatedLaborHours: newLead.estimateSnapshot.hoursPerCleaningVisit,
           recommendedCrewSize: newLead.estimateSnapshot.recommendedCrewSize,
           squareFootage: newLead.squareFootage,
@@ -224,7 +225,12 @@ export const App: React.FC = () => {
         setLeads(fresh.leads);
         const reloaded = fresh.leads.find(l => l.leadId === confirmedLeadId);
         if (reloaded) {
-          finalLead = { ...reloaded, estimateSnapshot: newLead.estimateSnapshot };
+          finalLead = { 
+            ...reloaded, 
+            estimatedValue: newLead.estimatedValue || reloaded.estimatedValue,
+            annualContractValue: newLead.annualContractValue || reloaded.annualContractValue,
+            estimateSnapshot: newLead.estimateSnapshot 
+          };
         }
       } else {
         setLeads(prev => [finalLead, ...prev]);
