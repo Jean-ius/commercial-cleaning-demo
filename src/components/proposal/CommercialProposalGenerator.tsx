@@ -7,29 +7,34 @@ import {
   Copy, 
   Check 
 } from 'lucide-react';
-import { EstimateResult, ClientBrandConfig, ProposalData } from '../../types/cleanCommand';
+import { EstimateResult, ClientBrandConfig, ProposalData, LeadRecord } from '../../types/cleanCommand';
 import { facilitySectors, frequencyOptions, addOnServices } from '../../config/clientConfig';
 import { formatCurrency } from '../../utils/pricingEngine';
+import { AlertTriangle } from 'lucide-react';
 
 interface CommercialProposalGeneratorProps {
   estimate: EstimateResult;
   brandConfig: ClientBrandConfig;
   onBack: () => void;
+  activeLead?: LeadRecord | null;
+  onSaveProposal?: (proposalInfo: { proposalId: string; proposalStatus: 'GENERATED'; proposalIssueDate: string; proposalValidThrough: string }) => Promise<void> | void;
 }
 
 export const CommercialProposalGenerator: React.FC<CommercialProposalGeneratorProps> = ({
   estimate,
   brandConfig,
-  onBack
+  onBack,
+  activeLead,
+  onSaveProposal
 }) => {
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [copiedSummary, setCopiedSummary] = useState<boolean>(false);
 
   // Proposal Signer Information (Editable)
-  const [repSignerName, setRepSignerName] = useState<string>('Marcus Sterling');
+  const [repSignerName, setRepSignerName] = useState<string>(activeLead?.assignedSalesRep || 'Marcus Sterling');
   const [repSignerTitle, setRepSignerTitle] = useState<string>('Director of Operations');
 
-  const [clientSignerName, setClientSignerName] = useState<string>('David Vance');
+  const [clientSignerName, setClientSignerName] = useState<string>(activeLead?.fullName || 'David Vance');
   const [clientSignerTitle, setClientSignerTitle] = useState<string>('Director of Facilities');
 
   // Proposal Metadata
@@ -38,21 +43,47 @@ export const CommercialProposalGenerator: React.FC<CommercialProposalGeneratorPr
     const validUntil = new Date();
     validUntil.setDate(today.getDate() + 30);
 
+    const createdStr = today.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const validStr = validUntil.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const propId = activeLead?.proposalId || `PROP-${today.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
     return {
-      proposalId: `PROP-${today.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
-      createdDate: today.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      validUntilDate: validUntil.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      clientName: 'David Vance',
-      clientCompany: 'Commercial Facility Client',
-      clientEmail: 'facilities@clientcompany.com',
-      clientPhone: '(555) 234-5678',
-      facilityAddress: `1200 Commerce Blvd, Suite 400, ${brandConfig.primaryCity}`,
+      proposalId: propId,
+      createdDate: createdStr,
+      validUntilDate: validStr,
+      clientName: activeLead?.fullName || 'David Vance',
+      clientCompany: activeLead?.companyName || 'Commercial Facility Client',
+      clientEmail: activeLead?.businessEmail || 'facilities@clientcompany.com',
+      clientPhone: activeLead?.phoneNumber || '(555) 234-5678',
+      facilityAddress: activeLead?.propertyAddress || `1200 Commerce Blvd, Suite 400, ${brandConfig.primaryCity}`,
       estimate
     };
   });
 
+  // Proposal Completeness Validation
+  const missingFields: string[] = [];
+  if (!proposalData.clientName.trim()) missingFields.push('Contact Name');
+  if (!proposalData.clientCompany.trim()) missingFields.push('Company Name');
+  if (!proposalData.clientEmail.trim()) missingFields.push('Business Email');
+  if (!proposalData.clientPhone.trim()) missingFields.push('Phone Number');
+  if (!proposalData.facilityAddress.trim()) missingFields.push('Property Address');
+  if (!estimate.squareFootage || estimate.squareFootage <= 0) missingFields.push('Square Footage');
+  if (!estimate.totalEstimatedMonthlyInvestment || estimate.totalEstimatedMonthlyInvestment <= 0) missingFields.push('Saved Monthly Estimate');
+
   const sector = facilitySectors.find(s => s.id === estimate.sectorId) || facilitySectors[0];
   const frequency = frequencyOptions.find(f => f.id === estimate.frequencyId) || frequencyOptions[1];
+
+  const handlePrint = () => {
+    if (onSaveProposal) {
+      onSaveProposal({
+        proposalId: proposalData.proposalId,
+        proposalStatus: 'GENERATED',
+        proposalIssueDate: proposalData.createdDate,
+        proposalValidThrough: proposalData.validUntilDate
+      });
+    }
+    window.print();
+  };
 
   const handleCopyEmailSummary = () => {
     const text = `COMMERCIAL CLEANING SERVICE PROPOSAL
@@ -73,6 +104,30 @@ Guaranteed SLA: ${brandConfig.qualitySla || '4-Hour Prompt Re-Clean Guarantee'}`
 
   return (
     <div className="min-h-screen bg-slate-100 py-6 px-4 sm:px-6 lg:px-8 text-slate-900 selection:bg-blue-600 selection:text-white print:bg-white print:p-0 print:m-0 print:min-h-0">
+      
+      {/* Validation Prompt Banner if any required proposal fields are missing */}
+      {missingFields.length > 0 && (
+        <div className="max-w-[794px] mx-auto mb-4 p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs shadow-sm flex items-start gap-3 print:hidden">
+          <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h4 className="font-bold text-amber-950">Proposal Validation: Required Information Missing</h4>
+            <p className="mt-0.5 text-amber-800">
+              The following fields should be completed before authorizing this commercial agreement:
+            </p>
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {missingFields.map((field) => (
+                <span key={field} className="px-2 py-0.5 rounded bg-amber-200/80 font-semibold text-[11px] text-amber-900">
+                  • {field}
+                </span>
+              ))}
+            </div>
+            <p className="mt-2 text-[11px] text-amber-700">
+              Click <strong>Edit Document</strong> below to complete client details directly on this proposal.
+            </p>
+          </div>
+        </div>
+      )}
+
       
       {/* Top Action Toolbar (Hidden on Print) */}
       <div className="max-w-[794px] mx-auto mb-4 flex flex-wrap items-center justify-between gap-3 bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm print:hidden">
@@ -103,7 +158,7 @@ Guaranteed SLA: ${brandConfig.qualitySla || '4-Hour Prompt Re-Clean Guarantee'}`
 
           {/* UNIFIED NATIVE PRINT & SAVE AS PDF BUTTON */}
           <button
-            onClick={() => window.print()}
+            onClick={handlePrint}
             className="flex items-center gap-2 px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black shadow-md shadow-blue-600/25 transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
           >
             <Printer className="w-4 h-4" />

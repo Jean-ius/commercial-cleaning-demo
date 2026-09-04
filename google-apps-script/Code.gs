@@ -1,65 +1,80 @@
 /**
  * =========================================================================
- * COMMERCIAL CLEANING - GOOGLE SHEETS WALKTHROUGH BOOKING BACKEND
+ * COMMERCIAL CLEANING SALES & ESTIMATING SYSTEM - GOOGLE SHEETS BACKEND
  * =========================================================================
  * 
- * Connected Spreadsheet ID: 15lDGthD8xdEIv0DlK5GhHGyCJdBe0-jBqtnDX4zeaOM
- * Spreadsheet URL: https://docs.google.com/spreadsheets/d/15lDGthD8xdEIv0DlK5GhHGyCJdBe0-jBqtnDX4zeaOM/edit
- * 
- * ARCHITECTURE:
- * 1. Sheet 1: "Bookings" (21 Columns A-U: Complete lead record & frozen estimate snapshot)
- * 2. Sheet 2: "Settings" (Configurable business settings & notification email)
- * 3. Sheet 3: "Activity Log" (Audit trail of booking creation and staff status changes)
+ * ARCHITECTURE (4 SHEETS):
+ * 1. Sheet 1: "Leads" (Exactly 15 human-readable sales columns, formatted for executive visibility)
+ * 2. Sheet 2: "Lead Details" (Full structured persistence for LeadRecord fields not visible in Leads view)
+ * 3. Sheet 3: "Settings" (Company brand, terms, SLA, sales rep, and notification email)
+ * 4. Sheet 4: "Activity Log" (Audit trail of lead lifecycle, status transitions, estimates, and walkthroughs)
  * 
  * SETUP INSTRUCTIONS:
- * 1. Open your Google Sheet: https://docs.google.com/spreadsheets/d/15lDGthD8xdEIv0DlK5GhHGyCJdBe0-jBqtnDX4zeaOM/edit
+ * 1. Open your target Google Sheet.
  * 2. In the top menu, click Extensions > Apps Script.
  * 3. Replace all existing code in the editor with this entire file.
- * 4. Click the Save icon (💾).
- * 5. In the toolbar, select "setupSpreadsheet" and click "Run" (▶).
- *    -> This will automatically create and format "Bookings", "Settings", and "Activity Log"!
- * 6. Click "Deploy" (top right) > "Manage deployments" or "New deployment".
- *    - Type: Web app
- *    - Execute as: Me
- *    - Who has access: Anyone
- * 7. Click Deploy and copy the Web App URL.
+ * 4. Click the Save icon.
+ * 5. Select "setupSpreadsheet" from the run dropdown and click "Run".
+ *    -> Automatically creates and formats "Leads", "Lead Details", "Settings", and "Activity Log"!
+ * 6. Click "Deploy" > "New deployment" > Select type "Web app".
+ *    - Execute as: "Me"
+ *    - Who has access: "Anyone" (handled via POST/GET for web app webhook)
+ * 7. Copy the Web App URL and paste it into your clientConfig or app settings.
  */
 
 // SPREADSHEET CONFIGURATION
 var SPREADSHEET_ID = "15lDGthD8xdEIv0DlK5GhHGyCJdBe0-jBqtnDX4zeaOM";
 
 var SHEET_NAMES = {
-  BOOKINGS: "Bookings",
+  LEADS: "Leads",
+  LEAD_DETAILS: "Lead Details",
   SETTINGS: "Settings",
   ACTIVITY_LOG: "Activity Log"
 };
 
-// SHEET 1: BOOKINGS - EXACT 21 HEADERS (Columns A to U)
-var BOOKINGS_HEADERS = [
-  "Booking ID",                                      // A1
-  "Submission Date",                                 // B1
-  "Submission Time",                                 // C1
-  "Full Name",                                       // D1
-  "Company / Property Name",                         // E1
-  "Business Work Email",                             // F1
-  "Direct Phone Number",                             // G1
-  "Facility Type",                                   // H1
-  "Square Footage",                                  // I1
-  "Cleaning Frequency",                              // J1
-  "Ballpark Estimate Low",                           // K1
-  "Ballpark Estimate High",                          // L1
-  "Preferred Walkthrough Date",                      // M1
-  "Preferred Time Window",                           // N1
-  "Cleaning Frustrations / Special Instructions",     // O1
-  "Booking Status",                                  // P1 (NEW | CONTACTED | CONFIRMED | COMPLETED | CANCELLED)
-  "Confirmed Date",                                  // Q1
-  "Confirmed Time",                                  // R1
-  "Assigned Sales Representative",                   // S1
-  "Internal Notes",                                  // T1
-  "Last Updated"                                     // U1
+// SHEET 1: LEADS - EXACTLY 15 HUMAN-READABLE SALES COLUMNS (A to O)
+var LEADS_HEADERS = [
+  "Lead ID",          // Col A (140px, Center)
+  "Date",             // Col B (110px, Center)
+  "Contact Name",     // Col C (160px, Left)
+  "Company",          // Col D (190px, Left)
+  "Email",            // Col E (210px, Left)
+  "Phone",            // Col F (140px, Left)
+  "Property",         // Col G (200px, Left)
+  "Facility Type",    // Col H (170px, Left)
+  "Square Footage",   // Col I (120px, Right, Numeric #,##0)
+  "Frequency",        // Col J (130px, Center)
+  "Monthly Estimate", // Col K (140px, Right, Currency $#,##0)
+  "Walkthrough",      // Col L (130px, Center, Dropdown)
+  "Proposal",         // Col M (130px, Center, Dropdown)
+  "Status",           // Col N (120px, Center, Dropdown)
+  "Notes"             // Col O (260px, Left, Wrapped)
 ];
 
-// SHEET 2: SETTINGS - DEFAULT CONFIGURATION
+// SHEET 2: LEAD DETAILS - PERSISTENT DATA EXTENSION FOR COMPLETE LEADRECORD
+var LEAD_DETAILS_HEADERS = [
+  "Lead ID",                  // Col A (Foreign Key)
+  "Lead Source",              // Col B
+  "Property Address",         // Col C
+  "Selected Add-Ons",         // Col D (Comma-separated)
+  "Special Requirements",     // Col E
+  "Rate Per Visit",           // Col F
+  "Annual Contract Value",    // Col G
+  "Estimated Labor Hours",    // Col H
+  "Recommended Crew Size",    // Col I
+  "Walkthrough Date",         // Col J
+  "Walkthrough Time",         // Col K
+  "Assigned Sales Rep",       // Col L
+  "Meeting Instructions",     // Col M
+  "Walkthrough Notes",        // Col N
+  "Proposal ID",              // Col O
+  "Proposal Issue Date",      // Col P
+  "Proposal Valid Through",   // Col Q
+  "Proposal Sent Date",       // Col R
+  "Last Updated"              // Col S
+];
+
+// SHEET 3: SETTINGS
 var DEFAULT_SETTINGS = [
   ["Company Name", "Apex Commercial Cleaning"],
   ["Company Logo URL", ""],
@@ -77,537 +92,669 @@ var DEFAULT_SETTINGS = [
   ["Notification Email", "jcsabillo23@gmail.com"]
 ];
 
-// SHEET 3: ACTIVITY LOG - EXACT 8 HEADERS (Columns A to H)
+// SHEET 4: ACTIVITY LOG
 var ACTIVITY_LOG_HEADERS = [
-  "Activity ID",       // A1
-  "Booking ID",        // B1
-  "Timestamp",         // C1
-  "Activity Type",     // D1 (BOOKING CREATED | STATUS CHANGE | NOTE ADDED)
-  "Previous Status",   // E1
-  "New Status",        // F1
-  "User / Staff",      // G1
-  "Notes"              // H1
+  "Activity ID",       // Col A
+  "Lead ID",           // Col B
+  "Timestamp",         // Col C
+  "Activity Type",     // Col D (LEAD CREATED | STATUS CHANGE | ESTIMATE SAVED | WALKTHROUGH SCHEDULED | PROPOSAL GENERATED | LEAD UPDATED)
+  "Previous Status",   // Col E
+  "New Status",        // Col F
+  "User / Staff",      // Col G
+  "Notes"              // Col H
 ];
 
 /**
- * Run this function once from the Apps Script editor to safely initialize all sheets,
- * format headers, set column widths, freeze rows, enable filters, and add validation.
+ * Initialize / setup all 4 sheets with headers, column widths, formatting, and validation.
  */
 function setupSpreadsheet() {
-  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var ss = getSpreadsheet();
 
-  // 1. SETUP SHEET 1: Bookings
-  var bookingsSheet = ss.getSheetByName(SHEET_NAMES.BOOKINGS);
-  if (!bookingsSheet) {
-    var firstSheet = ss.getSheets()[0];
-    if (firstSheet && firstSheet.getLastRow() === 0 && (firstSheet.getName() === "Sheet1" || firstSheet.getName() === "Walkthrough_Bookings")) {
-      firstSheet.setName(SHEET_NAMES.BOOKINGS);
-      bookingsSheet = firstSheet;
-    } else {
-      bookingsSheet = ss.insertSheet(SHEET_NAMES.BOOKINGS);
-    }
+  // 1. LEADS SHEET
+  var leadsSheet = ss.getSheetByName(SHEET_NAMES.LEADS);
+  if (!leadsSheet) {
+    leadsSheet = ss.insertSheet(SHEET_NAMES.LEADS, 0);
   }
+  setupLeadsSheet(leadsSheet);
 
-  // Set Bookings Headers if missing
-  var currentBookingsHeaders = bookingsSheet.getRange(1, 1, 1, BOOKINGS_HEADERS.length).getValues()[0];
-  if (currentBookingsHeaders[0] !== BOOKINGS_HEADERS[0]) {
-    bookingsSheet.getRange(1, 1, 1, BOOKINGS_HEADERS.length).setValues([BOOKINGS_HEADERS]);
+  // 2. LEAD DETAILS SHEET
+  var detailsSheet = ss.getSheetByName(SHEET_NAMES.LEAD_DETAILS);
+  if (!detailsSheet) {
+    detailsSheet = ss.insertSheet(SHEET_NAMES.LEAD_DETAILS, 1);
   }
+  setupLeadDetailsSheet(detailsSheet);
 
-  // Style Bookings Header Row: Dark Corporate Slate (#0F172A), Bold White text
-  var bookingsHeaderRange = bookingsSheet.getRange(1, 1, 1, BOOKINGS_HEADERS.length);
-  bookingsHeaderRange.setBackground("#0F172A");
-  bookingsHeaderRange.setFontColor("#FFFFFF");
-  bookingsHeaderRange.setFontWeight("bold");
-  bookingsHeaderRange.setFontFamily("Arial");
-  bookingsHeaderRange.setFontSize(10);
-  bookingsHeaderRange.setHorizontalAlignment("center");
-  bookingsHeaderRange.setVerticalAlignment("middle");
-  bookingsSheet.setRowHeight(1, 38);
-  bookingsSheet.setFrozenRows(1);
-
-  // Enable Filter on Bookings
-  if (!bookingsSheet.getFilter()) {
-    try {
-      bookingsSheet.getRange(1, 1, 1000, BOOKINGS_HEADERS.length).createFilter();
-    } catch (e) {
-      Logger.log("Filter notice: " + e.toString());
-    }
-  }
-
-  // Set Status Dropdown Validation on Column P (Booking Status)
-  var statusRule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(["NEW", "CONTACTED", "CONFIRMED", "COMPLETED", "CANCELLED"], true)
-    .setAllowInvalid(false)
-    .build();
-  bookingsSheet.getRange("P2:P1000").setDataValidation(statusRule);
-
-  // Set Column Widths on Bookings
-  bookingsSheet.setColumnWidth(1, 140);  // A: Booking ID
-  bookingsSheet.setColumnWidth(2, 120);  // B: Submission Date
-  bookingsSheet.setColumnWidth(3, 110);  // C: Submission Time
-  bookingsSheet.setColumnWidth(4, 160);  // D: Full Name
-  bookingsSheet.setColumnWidth(5, 200);  // E: Company Name
-  bookingsSheet.setColumnWidth(6, 220);  // F: Business Email
-  bookingsSheet.setColumnWidth(7, 140);  // G: Phone Number
-  bookingsSheet.setColumnWidth(8, 180);  // H: Facility Type
-  bookingsSheet.setColumnWidth(9, 130);  // I: Square Footage
-  bookingsSheet.setColumnWidth(10, 140); // J: Cleaning Frequency
-  bookingsSheet.setColumnWidth(11, 140); // K: Ballpark Low
-  bookingsSheet.setColumnWidth(12, 140); // L: Ballpark High
-  bookingsSheet.setColumnWidth(13, 150); // M: Preferred Date
-  bookingsSheet.setColumnWidth(14, 210); // N: Preferred Time
-  bookingsSheet.setColumnWidth(15, 280); // O: Frustrations
-  bookingsSheet.setColumnWidth(16, 130); // P: Status
-  bookingsSheet.setColumnWidth(17, 130); // Q: Confirmed Date
-  bookingsSheet.setColumnWidth(18, 130); // R: Confirmed Time
-  bookingsSheet.setColumnWidth(19, 180); // S: Sales Rep
-  bookingsSheet.setColumnWidth(20, 240); // T: Internal Notes
-  bookingsSheet.setColumnWidth(21, 160); // U: Last Updated
-
-  // 2. SETUP SHEET 2: Settings
+  // 3. SETTINGS SHEET
   var settingsSheet = ss.getSheetByName(SHEET_NAMES.SETTINGS);
   if (!settingsSheet) {
-    settingsSheet = ss.insertSheet(SHEET_NAMES.SETTINGS);
+    settingsSheet = ss.insertSheet(SHEET_NAMES.SETTINGS, 2);
+  }
+  setupSettingsSheet(settingsSheet);
+
+  // 4. ACTIVITY LOG SHEET
+  var logSheet = ss.getSheetByName(SHEET_NAMES.ACTIVITY_LOG);
+  if (!logSheet) {
+    logSheet = ss.insertSheet(SHEET_NAMES.ACTIVITY_LOG, 3);
+  }
+  setupActivityLogSheet(logSheet);
+
+  Logger.log("CleanCommand Pro: 4-Sheet Architecture successfully configured!");
+}
+
+function getSpreadsheet() {
+  if (SPREADSHEET_ID && SPREADSHEET_ID.trim() !== "") {
+    try {
+      return SpreadsheetApp.openById(SPREADSHEET_ID.trim());
+    } catch (e) {
+      // fallback to active
+    }
+  }
+  return SpreadsheetApp.getActiveSpreadsheet();
+}
+
+function setupLeadsSheet(sheet) {
+  sheet.clear();
+  sheet.appendRow(LEADS_HEADERS);
+
+  var headerRange = sheet.getRange(1, 1, 1, 15);
+  headerRange.setBackground("#0F172A");
+  headerRange.setFontColor("#FFFFFF");
+  headerRange.setFontWeight("bold");
+  headerRange.setFontFamily("Arial");
+  headerRange.setFontSize(10);
+  headerRange.setHorizontalAlignment("center");
+  sheet.setRowHeight(1, 38);
+  sheet.setFrozenRows(1);
+
+  var colWidths = [140, 110, 160, 190, 210, 140, 200, 170, 120, 130, 140, 130, 130, 120, 260];
+  for (var i = 0; i < colWidths.length; i++) {
+    sheet.setColumnWidth(i + 1, colWidths[i]);
   }
 
-  var currentSettingsHeaders = settingsSheet.getRange(1, 1, 1, 2).getValues()[0];
-  if (currentSettingsHeaders[0] !== "Setting" || currentSettingsHeaders[1] !== "Value") {
-    settingsSheet.getRange(1, 1, 1, 2).setValues([["Setting", "Value"]]);
+  // Number & Currency formatting (Rows 2 to 1000)
+  sheet.getRange("I2:I1000").setNumberFormat("#,##0").setHorizontalAlignment("right");
+  sheet.getRange("K2:K1000").setNumberFormat("$#,##0").setHorizontalAlignment("right");
+  sheet.getRange("O2:O1000").setWrap(true);
+
+  // Dropdown validations
+  var walkthroughRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(["NOT SCHEDULED", "SCHEDULED", "COMPLETED", "CANCELLED"], true)
+    .build();
+  sheet.getRange("L2:L1000").setDataValidation(walkthroughRule);
+
+  var proposalRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(["NOT GENERATED", "GENERATED", "SENT", "ACCEPTED"], true)
+    .build();
+  sheet.getRange("M2:M1000").setDataValidation(proposalRule);
+
+  var statusRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(["NEW", "QUALIFIED", "WALKTHROUGH", "PROPOSAL", "WON", "LOST"], true)
+    .build();
+  sheet.getRange("N2:N1000").setDataValidation(statusRule);
+
+  // Filter
+  var existingFilter = sheet.getFilter();
+  if (existingFilter) existingFilter.remove();
+  sheet.getRange(1, 1, 1, 15).createFilter();
+}
+
+function setupLeadDetailsSheet(sheet) {
+  sheet.clear();
+  sheet.appendRow(LEAD_DETAILS_HEADERS);
+
+  var headerRange = sheet.getRange(1, 1, 1, LEAD_DETAILS_HEADERS.length);
+  headerRange.setBackground("#1E293B");
+  headerRange.setFontColor("#F8FAFC");
+  headerRange.setFontWeight("bold");
+  headerRange.setFontFamily("Arial");
+  headerRange.setFontSize(10);
+  sheet.setRowHeight(1, 35);
+  sheet.setFrozenRows(1);
+
+  for (var i = 1; i <= LEAD_DETAILS_HEADERS.length; i++) {
+    sheet.setColumnWidth(i, 160);
   }
+}
 
-  // Style Settings Header Row
-  var settingsHeaderRange = settingsSheet.getRange(1, 1, 1, 2);
-  settingsHeaderRange.setBackground("#0F172A");
-  settingsHeaderRange.setFontColor("#FFFFFF");
-  settingsHeaderRange.setFontWeight("bold");
-  settingsHeaderRange.setFontFamily("Arial");
-  settingsHeaderRange.setFontSize(10);
-  settingsHeaderRange.setHorizontalAlignment("center");
-  settingsSheet.setRowHeight(1, 38);
-  settingsSheet.setFrozenRows(1);
-  settingsSheet.setColumnWidth(1, 260);
-  settingsSheet.setColumnWidth(2, 450);
+function setupSettingsSheet(sheet) {
+  sheet.clear();
+  sheet.appendRow(["Setting Key", "Setting Value"]);
 
-  // Populate Default Settings only if empty
-  if (settingsSheet.getLastRow() <= 1) {
-    settingsSheet.getRange(2, 1, DEFAULT_SETTINGS.length, 2).setValues(DEFAULT_SETTINGS);
-    var settingsBodyRange = settingsSheet.getRange(2, 1, DEFAULT_SETTINGS.length, 2);
-    settingsBodyRange.setFontFamily("Arial");
-    settingsBodyRange.setFontSize(9.5);
-    settingsSheet.getRange(2, 1, DEFAULT_SETTINGS.length, 1).setFontWeight("bold");
+  var headerRange = sheet.getRange(1, 1, 1, 2);
+  headerRange.setBackground("#0F172A");
+  headerRange.setFontColor("#FFFFFF");
+  headerRange.setFontWeight("bold");
+  headerRange.setFontSize(10);
+  sheet.setRowHeight(1, 35);
+
+  for (var i = 0; i < DEFAULT_SETTINGS.length; i++) {
+    sheet.appendRow(DEFAULT_SETTINGS[i]);
   }
+  sheet.setColumnWidth(1, 260);
+  sheet.setColumnWidth(2, 420);
+}
 
-  // 3. SETUP SHEET 3: Activity Log
-  var activitySheet = ss.getSheetByName(SHEET_NAMES.ACTIVITY_LOG);
-  if (!activitySheet) {
-    activitySheet = ss.insertSheet(SHEET_NAMES.ACTIVITY_LOG);
+function setupActivityLogSheet(sheet) {
+  sheet.clear();
+  sheet.appendRow(ACTIVITY_LOG_HEADERS);
+
+  var headerRange = sheet.getRange(1, 1, 1, ACTIVITY_LOG_HEADERS.length);
+  headerRange.setBackground("#334155");
+  headerRange.setFontColor("#FFFFFF");
+  headerRange.setFontWeight("bold");
+  headerRange.setFontSize(10);
+  sheet.setRowHeight(1, 35);
+  sheet.setFrozenRows(1);
+
+  var logWidths = [150, 140, 170, 180, 130, 130, 140, 260];
+  for (var j = 0; j < logWidths.length; j++) {
+    sheet.setColumnWidth(j + 1, logWidths[j]);
   }
-
-  var currentActivityHeaders = activitySheet.getRange(1, 1, 1, ACTIVITY_LOG_HEADERS.length).getValues()[0];
-  if (currentActivityHeaders[0] !== ACTIVITY_LOG_HEADERS[0]) {
-    activitySheet.getRange(1, 1, 1, ACTIVITY_LOG_HEADERS.length).setValues([ACTIVITY_LOG_HEADERS]);
-  }
-
-  // Style Activity Log Header Row
-  var activityHeaderRange = activitySheet.getRange(1, 1, 1, ACTIVITY_LOG_HEADERS.length);
-  activityHeaderRange.setBackground("#0F172A");
-  activityHeaderRange.setFontColor("#FFFFFF");
-  activityHeaderRange.setFontWeight("bold");
-  activityHeaderRange.setFontFamily("Arial");
-  activityHeaderRange.setFontSize(10);
-  activityHeaderRange.setHorizontalAlignment("center");
-  activitySheet.setRowHeight(1, 38);
-  activitySheet.setFrozenRows(1);
-
-  activitySheet.setColumnWidth(1, 130); // Activity ID
-  activitySheet.setColumnWidth(2, 140); // Booking ID
-  activitySheet.setColumnWidth(3, 170); // Timestamp
-  activitySheet.setColumnWidth(4, 150); // Activity Type
-  activitySheet.setColumnWidth(5, 120); // Previous Status
-  activitySheet.setColumnWidth(6, 120); // New Status
-  activitySheet.setColumnWidth(7, 160); // User / Staff
-  activitySheet.setColumnWidth(8, 280); // Notes
-
-  Logger.log("✅ All 3 sheets (Bookings, Settings, Activity Log) successfully initialized & formatted!");
 }
 
 /**
- * Helper: Read setting value from Settings sheet
+ * Web App GET endpoint (Read-only operations)
  */
-function getSettingValue(key, defaultValue) {
+function doGet(e) {
   try {
-    var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-    var sheet = ss.getSheetByName(SHEET_NAMES.SETTINGS);
-    if (!sheet) return defaultValue;
-    var data = sheet.getDataRange().getValues();
-    for (var i = 1; i < data.length; i++) {
-      if (String(data[i][0]).trim().toLowerCase() === String(key).trim().toLowerCase()) {
-        var val = String(data[i][1]).trim();
-        return val !== "" ? val : defaultValue;
+    var action = (e && e.parameter && e.parameter.action) ? e.parameter.action : "get_leads";
+    var ss = getSpreadsheet();
+
+    if (action === "get_leads") {
+      var leads = getLeadsData(ss);
+      return jsonResponse({ success: true, count: leads.length, leads: leads });
+    }
+
+    if (action === "get_lead_details") {
+      var leadId = e.parameter.leadId;
+      if (!leadId) {
+        return jsonResponse({ success: false, error: "Missing leadId parameter" }, 400);
       }
+      var fullLead = getFullLeadRecord(ss, leadId);
+      if (!fullLead) {
+        return jsonResponse({ success: false, error: "Lead not found: " + leadId }, 404);
+      }
+      return jsonResponse({ success: true, lead: fullLead });
     }
-  } catch (err) {
-    Logger.log("Error reading setting " + key + ": " + err.toString());
-  }
-  return defaultValue;
-}
 
-/**
- * Helper: Record entry in Activity Log sheet
- */
-function logActivity(bookingId, activityType, prevStatus, newStatus, userOrStaff, notes) {
-  try {
-    var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-    var sheet = ss.getSheetByName(SHEET_NAMES.ACTIVITY_LOG);
-    if (!sheet) {
-      setupSpreadsheet();
-      sheet = ss.getSheetByName(SHEET_NAMES.ACTIVITY_LOG);
+    if (action === "get_settings") {
+      var settings = getSettingsMap(ss);
+      return jsonResponse({ success: true, settings: settings });
     }
-    
-    var year = new Date().getFullYear();
-    var randomNum = Math.floor(1000 + Math.random() * 9000);
-    var activityId = "ACT-" + year + "-" + randomNum;
-    var nowFormatted = Utilities.formatDate(new Date(), Session.getScriptTimeZone() || "GMT+8", "MMM d, yyyy h:mm a");
 
-    var rowValues = [
-      activityId,
-      bookingId,
-      nowFormatted,
-      activityType,
-      prevStatus || "",
-      newStatus || "",
-      userOrStaff || "System",
-      notes || ""
-    ];
-
-    sheet.appendRow(rowValues);
-    var lastRow = sheet.getLastRow();
-    var range = sheet.getRange(lastRow, 1, 1, ACTIVITY_LOG_HEADERS.length);
-    range.setFontFamily("Arial");
-    range.setFontSize(9.5);
-    sheet.getRange(lastRow, 1).setHorizontalAlignment("center").setFontWeight("bold");
-    sheet.getRange(lastRow, 2).setHorizontalAlignment("center");
-    sheet.getRange(lastRow, 4).setHorizontalAlignment("center").setFontWeight("bold");
-    sheet.getRange(lastRow, 5, 1, 2).setHorizontalAlignment("center");
+    return jsonResponse({ success: false, error: "Invalid action: " + action }, 400);
   } catch (err) {
-    Logger.log("Error writing activity log: " + err.toString());
+    return jsonResponse({ success: false, error: err.toString() }, 500);
   }
 }
 
 /**
- * Helper: Send Executive Email Notification to configured Notification Email
- */
-function sendBookingNotificationEmail(booking, companyName, notificationEmail) {
-  if (!notificationEmail || notificationEmail.indexOf("@") === -1) {
-    Logger.log("No valid notification email configured.");
-    return;
-  }
-
-  var subject = "New Facility Walkthrough Request — [" + booking.bookingId + "]";
-  
-  var htmlBody = ""
-    + "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #0F172A; border: 1px solid #E2E8F0; border-radius: 12px; overflow: hidden;'>"
-    + "  <div style='background-color: #0F172A; color: #FFFFFF; padding: 20px 24px;'>"
-    + "    <h2 style='margin: 0; font-size: 18px; font-weight: bold;'>" + companyName + "</h2>"
-    + "    <p style='margin: 4px 0 0 0; font-size: 12px; color: #94A3B8;'>New On-Site Facility Walkthrough Request Received</p>"
-    + "  </div>"
-    + "  <div style='padding: 24px; background-color: #FFFFFF;'>"
-    + "    <div style='background-color: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px;'>"
-    + "      <strong style='color: #1E40AF; font-size: 13px;'>Booking Reference ID:</strong> "
-    + "      <span style='font-family: monospace; font-size: 14px; font-weight: bold; color: #1E3A8A;'>" + booking.bookingId + "</span>"
-    + "      <span style='float: right; background-color: #DBEAFE; color: #1E40AF; font-size: 11px; font-weight: bold; padding: 2px 8px; border-radius: 4px;'>Status: NEW</span>"
-    + "    </div>"
-    + "    <h3 style='font-size: 14px; text-transform: uppercase; color: #64748B; margin: 0 0 12px 0; border-bottom: 1px solid #E2E8F0; padding-bottom: 4px;'>Prospect Contact Information</h3>"
-    + "    <table style='width: 100%; font-size: 13px; margin-bottom: 20px; border-collapse: collapse;'>"
-    + "      <tr><td style='padding: 6px 0; color: #64748B; width: 40%;'>Full Name:</td><td style='padding: 6px 0; font-weight: bold;'>" + booking.fullName + "</td></tr>"
-    + "      <tr><td style='padding: 6px 0; color: #64748B;'>Company / Property:</td><td style='padding: 6px 0; font-weight: bold;'>" + booking.companyName + "</td></tr>"
-    + "      <tr><td style='padding: 6px 0; color: #64748B;'>Business Work Email:</td><td style='padding: 6px 0;'><a href='mailto:" + booking.businessEmail + "' style='color: #2563EB; font-weight: bold;'>" + booking.businessEmail + "</a></td></tr>"
-    + "      <tr><td style='padding: 6px 0; color: #64748B;'>Direct Phone Number:</td><td style='padding: 6px 0;'><a href='tel:" + booking.phoneNumber + "' style='color: #2563EB; font-weight: bold;'>" + booking.phoneNumber + "</a></td></tr>"
-    + "    </table>"
-    + "    <h3 style='font-size: 14px; text-transform: uppercase; color: #64748B; margin: 0 0 12px 0; border-bottom: 1px solid #E2E8F0; padding-bottom: 4px;'>Requested Schedule &amp; Facility Context</h3>"
-    + "    <table style='width: 100%; font-size: 13px; margin-bottom: 20px; border-collapse: collapse;'>"
-    + "      <tr><td style='padding: 6px 0; color: #64748B; width: 40%;'>Preferred Date:</td><td style='padding: 6px 0; font-weight: bold;'>" + booking.preferredWalkthroughDate + "</td></tr>"
-    + "      <tr><td style='padding: 6px 0; color: #64748B;'>Preferred Time Window:</td><td style='padding: 6px 0; font-weight: bold;'>" + booking.preferredTimeWindow + "</td></tr>"
-    + "      <tr><td style='padding: 6px 0; color: #64748B;'>Facility Sector:</td><td style='padding: 6px 0;'>" + booking.facilityType + "</td></tr>"
-    + "      <tr><td style='padding: 6px 0; color: #64748B;'>Cleanable Square Footage:</td><td style='padding: 6px 0; font-weight: bold;'>" + Number(booking.squareFootage).toLocaleString() + " sq ft</td></tr>"
-    + "      <tr><td style='padding: 6px 0; color: #64748B;'>Cleaning Frequency:</td><td style='padding: 6px 0;'>" + booking.cleaningFrequency + "</td></tr>"
-    + "      <tr><td style='padding: 6px 0; color: #64748B;'>Ballpark Estimate Range:</td><td style='padding: 6px 0; color: #1D4ED8; font-weight: bold;'>$" + Number(booking.ballparkEstimateLow).toLocaleString() + " – $" + Number(booking.ballparkEstimateHigh).toLocaleString() + " / mo</td></tr>"
-    + "      <tr><td style='padding: 6px 0; color: #64748B;'>Special Instructions / Notes:</td><td style='padding: 6px 0; font-style: italic; color: #334155;'>" + (booking.cleaningFrustrations || "None provided") + "</td></tr>"
-    + "    </table>"
-    + "    <div style='text-align: center; margin-top: 24px; padding-top: 16px; border-top: 1px solid #E2E8F0;'>"
-    + "      <a href='https://docs.google.com/spreadsheets/d/" + SPREADSHEET_ID + "/edit' style='background-color: #2563EB; color: #FFFFFF; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: bold; display: inline-block;'>Open Google Sheets CRM</a>"
-    + "    </div>"
-    + "  </div>"
-    + "  <div style='background-color: #F8FAFC; color: #94A3B8; font-size: 11px; padding: 12px 24px; text-align: center; border-top: 1px solid #E2E8F0;'>"
-    + "    Submitted on " + booking.submissionDate + " at " + booking.submissionTime + " • Automated Dispatch"
-    + "  </div>"
-    + "</div>";
-
-  MailApp.sendEmail({
-    to: notificationEmail,
-    subject: subject,
-    htmlBody: htmlBody
-  });
-  
-  Logger.log("✅ Email notification sent to " + notificationEmail);
-}
-
-/**
- * Main Webhook POST Handler: Validates, Prevents Duplicates, Saves to Bookings,
- * Logs Activity, and Dispatches Notification Email.
+ * Web App POST endpoint (Idempotent write/update operations with LockService)
  */
 function doPost(e) {
   var lock = LockService.getScriptLock();
-  
   try {
-    // 1. Double Booking & Race Condition Protection (Wait up to 30s)
-    lock.waitLock(30000);
+    lock.waitLock(30000); // 30s lock for concurrency safety
 
-    if (!e || !e.postData || !e.postData.contents) {
-      return ContentService.createTextOutput(JSON.stringify({
-        success: false,
-        error: "Missing request payload."
-      })).setMimeType(ContentService.MimeType.JSON);
+    var payload = {};
+    if (e && e.postData && e.postData.contents) {
+      try {
+        payload = JSON.parse(e.postData.contents);
+      } catch (pe) {
+        return jsonResponse({ success: false, error: "Malformed JSON payload" }, 400);
+      }
     }
 
-    var payload = JSON.parse(e.postData.contents);
+    var action = payload.action || (e && e.parameter && e.parameter.action);
     var data = payload.data || payload;
+    var ss = getSpreadsheet();
 
-    // 2. Strict Server-Side Validation
-    if (!data.fullName || String(data.fullName).trim().length < 2) {
-      return ContentService.createTextOutput(JSON.stringify({
-        success: false,
-        error: "Full Name is required (minimum 2 characters)."
-      })).setMimeType(ContentService.MimeType.JSON);
+    if (action === "create_lead") {
+      return handleCreateLead(ss, data);
+    } else if (action === "save_estimate") {
+      return handleSaveEstimate(ss, data);
+    } else if (action === "update_walkthrough") {
+      return handleUpdateWalkthrough(ss, data);
+    } else if (action === "update_proposal") {
+      return handleUpdateProposal(ss, data);
+    } else if (action === "update_status") {
+      return handleUpdateStatus(ss, data);
+    } else if (action === "update_lead") {
+      return handleUpdateLead(ss, data);
     }
 
-    if (!data.companyName || String(data.companyName).trim().length < 2) {
-      return ContentService.createTextOutput(JSON.stringify({
-        success: false,
-        error: "Company or Property Name is required."
-      })).setMimeType(ContentService.MimeType.JSON);
-    }
-
-    var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!data.businessEmail || !emailRegex.test(String(data.businessEmail).trim())) {
-      return ContentService.createTextOutput(JSON.stringify({
-        success: false,
-        error: "A valid business work email address is required."
-      })).setMimeType(ContentService.MimeType.JSON);
-    }
-
-    var phoneDigits = String(data.phoneNumber || "").replace(/\D/g, "");
-    if (!data.phoneNumber || phoneDigits.length < 7) {
-      return ContentService.createTextOutput(JSON.stringify({
-        success: false,
-        error: "A valid phone number is required (minimum 7 digits)."
-      })).setMimeType(ContentService.MimeType.JSON);
-    }
-
-    if (!data.preferredWalkthroughDate) {
-      return ContentService.createTextOutput(JSON.stringify({
-        success: false,
-        error: "Preferred Walkthrough Date is required."
-      })).setMimeType(ContentService.MimeType.JSON);
-    }
-
-    if (!data.preferredTimeWindow) {
-      return ContentService.createTextOutput(JSON.stringify({
-        success: false,
-        error: "Preferred Time Window is required."
-      })).setMimeType(ContentService.MimeType.JSON);
-    }
-
-    var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-    var bookingsSheet = ss.getSheetByName(SHEET_NAMES.BOOKINGS);
-
-    if (!bookingsSheet) {
-      setupSpreadsheet();
-      bookingsSheet = ss.getSheetByName(SHEET_NAMES.BOOKINGS);
-    }
-
-    // 3. Idempotency & Duplicate Submission Prevention
-    var bookingId = String(data.bookingId || "").trim();
-    if (bookingId !== "") {
-      var existingData = bookingsSheet.getDataRange().getValues();
-      for (var r = 1; r < existingData.length; r++) {
-        if (String(existingData[r][0]).trim() === bookingId) {
-          Logger.log("Duplicate request detected for existing Booking ID: " + bookingId);
-          return ContentService.createTextOutput(JSON.stringify({
-            success: true,
-            bookingId: bookingId,
-            row: r + 1,
-            isDuplicate: true,
-            message: "Booking request was already recorded previously."
-          })).setMimeType(ContentService.MimeType.JSON);
-        }
-      }
-    } else {
-      var year = new Date().getFullYear();
-      var rand = Math.floor(1000 + Math.random() * 9000);
-      bookingId = "WK-" + year + "-" + rand;
-      data.bookingId = bookingId;
-    }
-
-    // 4. Formula Injection Protection Helper (=, +, -, @)
-    function sanitize(val) {
-      if (val === null || val === undefined) return "";
-      var str = String(val).trim();
-      if (/^[=+\-@]/.test(str)) {
-        return "'" + str;
-      }
-      return str;
-    }
-
-    var submissionDate = data.submissionDate || Utilities.formatDate(new Date(), Session.getScriptTimeZone() || "GMT+8", "MMM d, yyyy");
-    var submissionTime = data.submissionTime || Utilities.formatDate(new Date(), Session.getScriptTimeZone() || "GMT+8", "h:mm a");
-    var timestampIso = data.submissionTimestamp || new Date().toISOString();
-
-    // 5. Construct 21-Column Row Values matching Bookings Sheet Schema exactly
-    var rowValues = [
-      sanitize(bookingId),                                     // A: Booking ID
-      sanitize(submissionDate),                                // B: Submission Date
-      sanitize(submissionTime),                                // C: Submission Time
-      sanitize(data.fullName),                                 // D: Full Name
-      sanitize(data.companyName),                              // E: Company / Property Name
-      sanitize(data.businessEmail),                            // F: Business Work Email
-      sanitize(data.phoneNumber),                              // G: Direct Phone Number
-      sanitize(data.facilityType || "Commercial Facility"),    // H: Facility Type
-      Number(data.squareFootage) || 0,                         // I: Square Footage
-      sanitize(data.cleaningFrequency || "Standard"),          // J: Cleaning Frequency
-      Number(data.ballparkEstimateLow) || 0,                   // K: Ballpark Estimate Low
-      Number(data.ballparkEstimateHigh) || 0,                  // L: Ballpark Estimate High
-      sanitize(data.preferredWalkthroughDate),                 // M: Preferred Walkthrough Date
-      sanitize(data.preferredTimeWindow),                      // N: Preferred Time Window
-      sanitize(data.cleaningFrustrations || "None provided"),  // O: Cleaning Frustrations / Special Instructions
-      "NEW",                                                   // P: Booking Status (Always initial 'NEW')
-      "",                                                      // Q: Confirmed Date (Internal staff use)
-      "",                                                      // R: Confirmed Time (Internal staff use)
-      sanitize(data.assignedSalesRep || getSettingValue("Default Assigned Sales Representative", "Marcus Sterling")), // S: Sales Rep
-      "",                                                      // T: Internal Notes (Internal staff use)
-      timestampIso                                             // U: Last Updated
-    ];
-
-    bookingsSheet.appendRow(rowValues);
-    var newRowNumber = bookingsSheet.getLastRow();
-
-    // Format new row
-    var rowRange = bookingsSheet.getRange(newRowNumber, 1, 1, BOOKINGS_HEADERS.length);
-    rowRange.setFontFamily("Arial");
-    rowRange.setFontSize(9.5);
-    rowRange.setVerticalAlignment("middle");
-
-    // Number formatting
-    bookingsSheet.getRange(newRowNumber, 9).setNumberFormat("#,##0");           // Sq Ft
-    bookingsSheet.getRange(newRowNumber, 11, 1, 2).setNumberFormat("$#,##0");  // Low & High Ballpark
-
-    // Alignment formatting
-    bookingsSheet.getRange(newRowNumber, 1).setHorizontalAlignment("center").setFontWeight("bold");
-    bookingsSheet.getRange(newRowNumber, 2, 1, 2).setHorizontalAlignment("center");
-    bookingsSheet.getRange(newRowNumber, 16).setHorizontalAlignment("center").setFontWeight("bold");
-
-    // 6. Record Audit in Activity Log Sheet
-    logActivity(
-      bookingId,
-      "BOOKING CREATED",
-      "",
-      "NEW",
-      "Website Prospect",
-      "New walkthrough requested for " + data.companyName + " (" + (Number(data.squareFootage) || 0).toLocaleString() + " sq ft)."
-    );
-
-    // 7. Dispatch Email Notification
-    var companyName = getSettingValue("Company Name", "Apex Commercial Cleaning");
-    var notificationEmail = getSettingValue("Notification Email", "jcsabillo23@gmail.com");
-
-    try {
-      sendBookingNotificationEmail(data, companyName, notificationEmail);
-    } catch (emailErr) {
-      Logger.log("Email dispatch notice: " + emailErr.toString());
-      // Booking is already saved, do not fail the request if email fails
-    }
-
-    return ContentService.createTextOutput(JSON.stringify({
-      success: true,
-      bookingId: bookingId,
-      row: newRowNumber,
-      message: "Walkthrough request successfully saved, logged, and confirmed."
-    })).setMimeType(ContentService.MimeType.JSON);
+    return jsonResponse({ success: false, error: "Unsupported POST action: " + action }, 400);
 
   } catch (err) {
-    Logger.log("Error in doPost: " + err.toString());
-    return ContentService.createTextOutput(JSON.stringify({
-      success: false,
-      error: err.toString()
-    })).setMimeType(ContentService.MimeType.JSON);
-
+    return jsonResponse({ success: false, error: err.toString() }, 500);
   } finally {
     lock.releaseLock();
   }
 }
 
-/**
- * Automatic On-Edit Trigger: When staff changes Status (Column P) in Bookings,
- * automatically update 'Last Updated' and log a STATUS CHANGE in Activity Log.
- */
-function onEdit(e) {
-  try {
-    if (!e || !e.range) return;
-    var sheet = e.range.getSheet();
-    if (sheet.getName() !== SHEET_NAMES.BOOKINGS) return;
-    
-    var row = e.range.getRow();
-    var col = e.range.getColumn();
+// ---------------------------------------------------------------------------
+// DATA ACCESS & HANDLERS
+// ---------------------------------------------------------------------------
 
-    // Check if Column P (Column 16: Booking Status) was edited on a data row
-    if (col === 16 && row > 1) {
-      var newVal = String(e.value || "").trim();
-      var oldVal = String(e.oldValue || "").trim();
-      
-      if (newVal !== oldVal && newVal !== "") {
-        var bookingId = String(sheet.getRange(row, 1).getValue()).trim();
-        var userEmail = Session.getActiveUser().getEmail() || "Staff Member";
-        var nowIso = new Date().toISOString();
+function getLeadsData(ss) {
+  var sheet = ss.getSheetByName(SHEET_NAMES.LEADS);
+  if (!sheet) return [];
 
-        // Update Column U (Last Updated)
-        sheet.getRange(row, 21).setValue(nowIso);
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
 
-        // Record in Activity Log
-        logActivity(
-          bookingId,
-          "STATUS CHANGE",
-          oldVal,
-          newVal,
-          userEmail,
-          "Booking status updated to " + newVal + " by " + userEmail
-        );
-      }
-    }
-  } catch (err) {
-    Logger.log("onEdit notice: " + err.toString());
+  var values = sheet.getRange(2, 1, lastRow - 1, 15).getValues();
+  var leads = [];
+
+  for (var i = 0; i < values.length; i++) {
+    var row = values[i];
+    var leadId = String(row[0] || "").trim();
+    if (!leadId) continue;
+
+    leads.push({
+      leadId: leadId,
+      createdDate: String(row[1] || ""),
+      fullName: String(row[2] || ""),
+      companyName: String(row[3] || ""),
+      businessEmail: String(row[4] || ""),
+      phoneNumber: String(row[5] || ""),
+      propertyAddress: String(row[6] || ""),
+      facilityType: String(row[7] || ""),
+      squareFootage: Number(row[8]) || 0,
+      cleaningFrequency: String(row[9] || ""),
+      monthlyEstimate: Number(row[10]) || 0,
+      walkthroughStatus: String(row[11] || "NOT SCHEDULED"),
+      proposalStatus: String(row[12] || "NOT GENERATED"),
+      status: String(row[13] || "NEW"),
+      internalNotes: String(row[14] || "")
+    });
   }
+
+  return leads;
 }
 
-/**
- * Health Check GET endpoint for browser verification
- */
-function doGet(e) {
-  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  var bookingsSheet = ss.getSheetByName(SHEET_NAMES.BOOKINGS);
-  var settingsSheet = ss.getSheetByName(SHEET_NAMES.SETTINGS);
-  var activitySheet = ss.getSheetByName(SHEET_NAMES.ACTIVITY_LOG);
+function getFullLeadRecord(ss, leadId) {
+  var leadsSheet = ss.getSheetByName(SHEET_NAMES.LEADS);
+  var detailsSheet = ss.getSheetByName(SHEET_NAMES.LEAD_DETAILS);
+  if (!leadsSheet) return null;
 
-  return ContentService.createTextOutput(JSON.stringify({
-    status: "ok",
-    service: "Commercial Cleaning Google Sheets CRM & Webhook",
-    spreadsheetId: SPREADSHEET_ID,
-    sheetsReady: {
-      bookings: bookingsSheet !== null,
-      settings: settingsSheet !== null,
-      activityLog: activitySheet !== null
-    },
-    notificationEmail: getSettingValue("Notification Email", "jcsabillo23@gmail.com"),
-    timestamp: new Date().toISOString()
-  })).setMimeType(ContentService.MimeType.JSON);
+  var leadRowIndex = findRowIndexByLeadId(leadsSheet, leadId);
+  if (leadRowIndex === -1) return null;
+
+  var leadValues = leadsSheet.getRange(leadRowIndex, 1, 1, 15).getValues()[0];
+  var detailValues = [];
+  if (detailsSheet) {
+    var detailRowIndex = findRowIndexByLeadId(detailsSheet, leadId);
+    if (detailRowIndex !== -1) {
+      detailValues = detailsSheet.getRange(detailRowIndex, 1, 1, LEAD_DETAILS_HEADERS.length).getValues()[0];
+    }
+  }
+
+  var selectedAddOns = [];
+  if (detailValues[3]) {
+    selectedAddOns = String(detailValues[3]).split(",").map(function(s) { return s.trim(); }).filter(Boolean);
+  }
+
+  return {
+    leadId: leadId,
+    createdDate: String(leadValues[1] || ""),
+    fullName: String(leadValues[2] || ""),
+    companyName: String(leadValues[3] || ""),
+    businessEmail: String(leadValues[4] || ""),
+    phoneNumber: String(leadValues[5] || ""),
+    propertyAddress: String(leadValues[6] || detailValues[2] || ""),
+    facilityType: String(leadValues[7] || ""),
+    squareFootage: Number(leadValues[8]) || 0,
+    cleaningFrequency: String(leadValues[9] || ""),
+    monthlyEstimate: Number(leadValues[10]) || 0,
+    walkthroughStatus: String(leadValues[11] || "NOT SCHEDULED"),
+    proposalStatus: String(leadValues[12] || "NOT GENERATED"),
+    status: String(leadValues[13] || "NEW"),
+    internalNotes: String(leadValues[14] || ""),
+
+    // Extended Details
+    leadSource: String(detailValues[1] || "Website"),
+    selectedAddOns: selectedAddOns,
+    specialRequirements: String(detailValues[4] || ""),
+    ratePerVisit: Number(detailValues[5]) || 0,
+    annualContractValue: Number(detailValues[6]) || 0,
+    estimatedLaborHours: Number(detailValues[7]) || 0,
+    recommendedCrewSize: Number(detailValues[8]) || 1,
+    walkthroughDate: String(detailValues[9] || ""),
+    walkthroughTime: String(detailValues[10] || ""),
+    assignedSalesRep: String(detailValues[11] || ""),
+    meetingInstructions: String(detailValues[12] || ""),
+    walkthroughNotes: String(detailValues[13] || ""),
+    proposalId: String(detailValues[14] || ""),
+    proposalIssueDate: String(detailValues[15] || ""),
+    proposalValidThrough: String(detailValues[16] || ""),
+    proposalSentDate: String(detailValues[17] || ""),
+    lastUpdated: String(detailValues[18] || new Date().toISOString())
+  };
+}
+
+function getSettingsMap(ss) {
+  var sheet = ss.getSheetByName(SHEET_NAMES.SETTINGS);
+  var map = {};
+  if (!sheet) return map;
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return map;
+
+  var values = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+  for (var i = 0; i < values.length; i++) {
+    var k = String(values[i][0] || "").trim();
+    if (k) map[k] = values[i][1];
+  }
+  return map;
+}
+
+function findRowIndexByLeadId(sheet, leadId) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return -1;
+  var colA = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  for (var i = 0; i < colA.length; i++) {
+    if (String(colA[i][0]).trim() === String(leadId).trim()) {
+      return i + 2; // 1-indexed row number
+    }
+  }
+  return -1;
+}
+
+// ---------------------------------------------------------------------------
+// WRITE OPERATIONS (In-Place Row Updates & Duplicate Prevention)
+// ---------------------------------------------------------------------------
+
+function handleCreateLead(ss, lead) {
+  var leadsSheet = ss.getSheetByName(SHEET_NAMES.LEADS);
+  var detailsSheet = ss.getSheetByName(SHEET_NAMES.LEAD_DETAILS);
+  if (!leadsSheet) throw new Error("Leads sheet missing. Please run setupSpreadsheet.");
+
+  var leadId = lead.leadId;
+  if (!leadId) {
+    var year = new Date().getFullYear();
+    var count = Math.max(1, leadsSheet.getLastRow());
+    leadId = "LEAD-" + year + "-" + ("0000" + count).slice(-4);
+  }
+
+  // Check if lead already exists (idempotency)
+  var existingRow = findRowIndexByLeadId(leadsSheet, leadId);
+  if (existingRow !== -1) {
+    return handleUpdateLead(ss, lead);
+  }
+
+  var dateStr = lead.createdDate || formatDate(new Date());
+  var nowIso = new Date().toISOString();
+
+  // 1. Append to Leads Sheet (15 columns)
+  var leadRow = [
+    leadId,
+    dateStr,
+    lead.fullName || "",
+    lead.companyName || "",
+    lead.businessEmail || "",
+    lead.phoneNumber || "",
+    lead.propertyAddress || "",
+    lead.facilityType || "",
+    Number(lead.squareFootage) || 0,
+    lead.cleaningFrequency || "",
+    Number(lead.monthlyEstimate) || 0,
+    lead.walkthroughStatus || "NOT SCHEDULED",
+    lead.proposalStatus || "NOT GENERATED",
+    lead.status || "NEW",
+    lead.internalNotes || ""
+  ];
+  leadsSheet.appendRow(leadRow);
+
+  // 2. Append to Lead Details Sheet
+  if (detailsSheet) {
+    var addOnsStr = Array.isArray(lead.selectedAddOns) ? lead.selectedAddOns.join(", ") : (lead.selectedAddOns || "");
+    var detailRow = [
+      leadId,
+      lead.leadSource || "Website",
+      lead.propertyAddress || "",
+      addOnsStr,
+      lead.specialRequirements || "",
+      Number(lead.ratePerVisit) || 0,
+      Number(lead.annualContractValue) || 0,
+      Number(lead.estimatedLaborHours) || 0,
+      Number(lead.recommendedCrewSize) || 1,
+      lead.walkthroughDate || "",
+      lead.walkthroughTime || "",
+      lead.assignedSalesRep || "",
+      lead.meetingInstructions || "",
+      lead.walkthroughNotes || "",
+      lead.proposalId || "",
+      lead.proposalIssueDate || "",
+      lead.proposalValidThrough || "",
+      lead.proposalSentDate || "",
+      nowIso
+    ];
+    detailsSheet.appendRow(detailRow);
+  }
+
+  // 3. Log Activity
+  logActivity(ss, leadId, "LEAD CREATED", "", lead.status || "NEW", "System / Sales", "Lead created via sales workflow");
+
+  return jsonResponse({
+    success: true,
+    message: "Lead created successfully",
+    leadId: leadId
+  });
+}
+
+function handleSaveEstimate(ss, data) {
+  var leadId = data.leadId;
+  if (!leadId) throw new Error("Missing leadId for save_estimate");
+
+  var leadsSheet = ss.getSheetByName(SHEET_NAMES.LEADS);
+  var detailsSheet = ss.getSheetByName(SHEET_NAMES.LEAD_DETAILS);
+  var rowIdx = findRowIndexByLeadId(leadsSheet, leadId);
+  if (rowIdx === -1) throw new Error("Lead not found: " + leadId);
+
+  // Update Col K (Monthly Estimate), Col H (Facility Type), Col I (Sq Ft), Col J (Frequency)
+  if (data.monthlyEstimate !== undefined) leadsSheet.getRange(rowIdx, 11).setValue(Number(data.monthlyEstimate) || 0);
+  if (data.facilityType) leadsSheet.getRange(rowIdx, 8).setValue(data.facilityType);
+  if (data.squareFootage) leadsSheet.getRange(rowIdx, 9).setValue(Number(data.squareFootage) || 0);
+  if (data.cleaningFrequency) leadsSheet.getRange(rowIdx, 10).setValue(data.cleaningFrequency);
+
+  // Update Lead Details
+  if (detailsSheet) {
+    var detIdx = findRowIndexByLeadId(detailsSheet, leadId);
+    if (detIdx !== -1) {
+      if (data.ratePerVisit !== undefined) detailsSheet.getRange(detIdx, 6).setValue(Number(data.ratePerVisit) || 0);
+      if (data.annualContractValue !== undefined) detailsSheet.getRange(detIdx, 7).setValue(Number(data.annualContractValue) || 0);
+      if (data.estimatedLaborHours !== undefined) detailsSheet.getRange(detIdx, 8).setValue(Number(data.estimatedLaborHours) || 0);
+      if (data.recommendedCrewSize !== undefined) detailsSheet.getRange(detIdx, 9).setValue(Number(data.recommendedCrewSize) || 1);
+      if (data.selectedAddOns) {
+        var addOnsStr = Array.isArray(data.selectedAddOns) ? data.selectedAddOns.join(", ") : String(data.selectedAddOns);
+        detailsSheet.getRange(detIdx, 4).setValue(addOnsStr);
+      }
+      detailsSheet.getRange(detIdx, 19).setValue(new Date().toISOString());
+    }
+  }
+
+  logActivity(ss, leadId, "ESTIMATE SAVED", "", "", "Estimator", "Saved monthly estimate: $" + (data.monthlyEstimate || 0));
+
+  return jsonResponse({ success: true, message: "Estimate saved successfully", leadId: leadId });
+}
+
+function handleUpdateWalkthrough(ss, data) {
+  var leadId = data.leadId;
+  if (!leadId) throw new Error("Missing leadId for update_walkthrough");
+
+  var leadsSheet = ss.getSheetByName(SHEET_NAMES.LEADS);
+  var detailsSheet = ss.getSheetByName(SHEET_NAMES.LEAD_DETAILS);
+  var rowIdx = findRowIndexByLeadId(leadsSheet, leadId);
+  if (rowIdx === -1) throw new Error("Lead not found: " + leadId);
+
+  // Update Col L (Walkthrough Status) in Leads
+  var wtStatus = data.walkthroughStatus || "SCHEDULED";
+  leadsSheet.getRange(rowIdx, 12).setValue(wtStatus);
+
+  if (detailsSheet) {
+    var detIdx = findRowIndexByLeadId(detailsSheet, leadId);
+    if (detIdx !== -1) {
+      if (data.walkthroughDate) detailsSheet.getRange(detIdx, 10).setValue(data.walkthroughDate);
+      if (data.walkthroughTime) detailsSheet.getRange(detIdx, 11).setValue(data.walkthroughTime);
+      if (data.assignedSalesRep) detailsSheet.getRange(detIdx, 12).setValue(data.assignedSalesRep);
+      if (data.meetingInstructions) detailsSheet.getRange(detIdx, 13).setValue(data.meetingInstructions);
+      if (data.walkthroughNotes) detailsSheet.getRange(detIdx, 14).setValue(data.walkthroughNotes);
+      detailsSheet.getRange(detIdx, 19).setValue(new Date().toISOString());
+    }
+  }
+
+  logActivity(ss, leadId, "WALKTHROUGH SCHEDULED", "", "", data.assignedSalesRep || "Sales Rep", "Date: " + (data.walkthroughDate || "") + " " + (data.walkthroughTime || ""));
+
+  return jsonResponse({ success: true, message: "Walkthrough updated successfully", leadId: leadId });
+}
+
+function handleUpdateProposal(ss, data) {
+  var leadId = data.leadId;
+  if (!leadId) throw new Error("Missing leadId for update_proposal");
+
+  var leadsSheet = ss.getSheetByName(SHEET_NAMES.LEADS);
+  var detailsSheet = ss.getSheetByName(SHEET_NAMES.LEAD_DETAILS);
+  var rowIdx = findRowIndexByLeadId(leadsSheet, leadId);
+  if (rowIdx === -1) throw new Error("Lead not found: " + leadId);
+
+  var propStatus = data.proposalStatus || "GENERATED";
+  leadsSheet.getRange(rowIdx, 13).setValue(propStatus);
+
+  if (detailsSheet) {
+    var detIdx = findRowIndexByLeadId(detailsSheet, leadId);
+    if (detIdx !== -1) {
+      if (data.proposalId) detailsSheet.getRange(detIdx, 15).setValue(data.proposalId);
+      if (data.proposalIssueDate) detailsSheet.getRange(detIdx, 16).setValue(data.proposalIssueDate);
+      if (data.proposalValidThrough) detailsSheet.getRange(detIdx, 17).setValue(data.proposalValidThrough);
+      if (data.proposalSentDate) detailsSheet.getRange(detIdx, 18).setValue(data.proposalSentDate);
+      detailsSheet.getRange(detIdx, 19).setValue(new Date().toISOString());
+    }
+  }
+
+  logActivity(ss, leadId, "PROPOSAL GENERATED", "", propStatus, "Proposal System", "Proposal: " + (data.proposalId || ""));
+
+  return jsonResponse({ success: true, message: "Proposal updated successfully", leadId: leadId });
+}
+
+function handleUpdateStatus(ss, data) {
+  var leadId = data.leadId;
+  if (!leadId) throw new Error("Missing leadId for update_status");
+
+  var leadsSheet = ss.getSheetByName(SHEET_NAMES.LEADS);
+  var rowIdx = findRowIndexByLeadId(leadsSheet, leadId);
+  if (rowIdx === -1) throw new Error("Lead not found: " + leadId);
+
+  var prevStatus = String(leadsSheet.getRange(rowIdx, 14).getValue() || "");
+  var newStatus = data.status || data.newStatus;
+  leadsSheet.getRange(rowIdx, 14).setValue(newStatus);
+
+  logActivity(ss, leadId, "STATUS CHANGE", prevStatus, newStatus, data.user || "Staff", data.notes || "Pipeline status transition");
+
+  return jsonResponse({ success: true, message: "Status updated successfully", leadId: leadId, status: newStatus });
+}
+
+function handleUpdateLead(ss, lead) {
+  var leadId = lead.leadId;
+  if (!leadId) throw new Error("Missing leadId for update_lead");
+
+  var leadsSheet = ss.getSheetByName(SHEET_NAMES.LEADS);
+  var detailsSheet = ss.getSheetByName(SHEET_NAMES.LEAD_DETAILS);
+  var rowIdx = findRowIndexByLeadId(leadsSheet, leadId);
+
+  if (rowIdx === -1) {
+    // If doesn't exist, create it
+    return handleCreateLead(ss, lead);
+  }
+
+  // Update in-place on Leads Sheet
+  if (lead.fullName !== undefined) leadsSheet.getRange(rowIdx, 3).setValue(lead.fullName);
+  if (lead.companyName !== undefined) leadsSheet.getRange(rowIdx, 4).setValue(lead.companyName);
+  if (lead.businessEmail !== undefined) leadsSheet.getRange(rowIdx, 5).setValue(lead.businessEmail);
+  if (lead.phoneNumber !== undefined) leadsSheet.getRange(rowIdx, 6).setValue(lead.phoneNumber);
+  if (lead.propertyAddress !== undefined) leadsSheet.getRange(rowIdx, 7).setValue(lead.propertyAddress);
+  if (lead.facilityType !== undefined) leadsSheet.getRange(rowIdx, 8).setValue(lead.facilityType);
+  if (lead.squareFootage !== undefined) leadsSheet.getRange(rowIdx, 9).setValue(Number(lead.squareFootage) || 0);
+  if (lead.cleaningFrequency !== undefined) leadsSheet.getRange(rowIdx, 10).setValue(lead.cleaningFrequency);
+  if (lead.monthlyEstimate !== undefined) leadsSheet.getRange(rowIdx, 11).setValue(Number(lead.monthlyEstimate) || 0);
+  if (lead.walkthroughStatus !== undefined) leadsSheet.getRange(rowIdx, 12).setValue(lead.walkthroughStatus);
+  if (lead.proposalStatus !== undefined) leadsSheet.getRange(rowIdx, 13).setValue(lead.proposalStatus);
+  if (lead.status !== undefined) leadsSheet.getRange(rowIdx, 14).setValue(lead.status);
+  if (lead.internalNotes !== undefined) leadsSheet.getRange(rowIdx, 15).setValue(lead.internalNotes);
+
+  // Update details sheet
+  if (detailsSheet) {
+    var detIdx = findRowIndexByLeadId(detailsSheet, leadId);
+    if (detIdx !== -1) {
+      if (lead.leadSource !== undefined) detailsSheet.getRange(detIdx, 2).setValue(lead.leadSource);
+      if (lead.propertyAddress !== undefined) detailsSheet.getRange(detIdx, 3).setValue(lead.propertyAddress);
+      if (lead.selectedAddOns !== undefined) {
+        var addOnsStr = Array.isArray(lead.selectedAddOns) ? lead.selectedAddOns.join(", ") : String(lead.selectedAddOns);
+        detailsSheet.getRange(detIdx, 4).setValue(addOnsStr);
+      }
+      if (lead.specialRequirements !== undefined) detailsSheet.getRange(detIdx, 5).setValue(lead.specialRequirements);
+      if (lead.ratePerVisit !== undefined) detailsSheet.getRange(detIdx, 6).setValue(Number(lead.ratePerVisit) || 0);
+      if (lead.annualContractValue !== undefined) detailsSheet.getRange(detIdx, 7).setValue(Number(lead.annualContractValue) || 0);
+      if (lead.estimatedLaborHours !== undefined) detailsSheet.getRange(detIdx, 8).setValue(Number(lead.estimatedLaborHours) || 0);
+      if (lead.recommendedCrewSize !== undefined) detailsSheet.getRange(detIdx, 9).setValue(Number(lead.recommendedCrewSize) || 1);
+      if (lead.walkthroughDate !== undefined) detailsSheet.getRange(detIdx, 10).setValue(lead.walkthroughDate);
+      if (lead.walkthroughTime !== undefined) detailsSheet.getRange(detIdx, 11).setValue(lead.walkthroughTime);
+      if (lead.assignedSalesRep !== undefined) detailsSheet.getRange(detIdx, 12).setValue(lead.assignedSalesRep);
+      if (lead.meetingInstructions !== undefined) detailsSheet.getRange(detIdx, 13).setValue(lead.meetingInstructions);
+      if (lead.walkthroughNotes !== undefined) detailsSheet.getRange(detIdx, 14).setValue(lead.walkthroughNotes);
+      if (lead.proposalId !== undefined) detailsSheet.getRange(detIdx, 15).setValue(lead.proposalId);
+      if (lead.proposalIssueDate !== undefined) detailsSheet.getRange(detIdx, 16).setValue(lead.proposalIssueDate);
+      if (lead.proposalValidThrough !== undefined) detailsSheet.getRange(detIdx, 17).setValue(lead.proposalValidThrough);
+      if (lead.proposalSentDate !== undefined) detailsSheet.getRange(detIdx, 18).setValue(lead.proposalSentDate);
+      detailsSheet.getRange(detIdx, 19).setValue(new Date().toISOString());
+    }
+  }
+
+  logActivity(ss, leadId, "LEAD UPDATED", "", lead.status || "", "Sales / Operations", "Updated lead information in-place");
+
+  return jsonResponse({ success: true, message: "Lead updated in-place successfully", leadId: leadId });
+}
+
+function logActivity(ss, leadId, activityType, prevStatus, newStatus, user, notes) {
+  var logSheet = ss.getSheetByName(SHEET_NAMES.ACTIVITY_LOG);
+  if (!logSheet) return;
+
+  var actId = "ACT-" + Date.now().toString(36).toUpperCase();
+  var timestamp = formatDate(new Date()) + " " + formatTime(new Date());
+
+  logSheet.appendRow([
+    actId,
+    leadId,
+    timestamp,
+    activityType,
+    prevStatus || "",
+    newStatus || "",
+    user || "Staff",
+    notes || ""
+  ]);
+}
+
+// ---------------------------------------------------------------------------
+// UTILITIES
+// ---------------------------------------------------------------------------
+
+function jsonResponse(obj, statusCode) {
+  var output = ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+  return output;
+}
+
+function formatDate(d) {
+  var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return months[d.getMonth()] + " " + d.getDate() + ", " + d.getFullYear();
+}
+
+function formatTime(d) {
+  var hours = d.getHours();
+  var minutes = d.getMinutes();
+  var ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  minutes = minutes < 10 ? "0" + minutes : minutes;
+  return hours + ":" + minutes + " " + ampm;
 }

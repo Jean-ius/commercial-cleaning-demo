@@ -147,6 +147,58 @@ export interface WalkthroughBookingRecord {
 // Backwards-compatible alias for existing imports
 export type WalkthroughLead = WalkthroughBookingRecord;
 
+export type LeadStatus = 'NEW' | 'QUALIFIED' | 'WALKTHROUGH' | 'PROPOSAL' | 'WON' | 'LOST';
+export type WalkthroughStatus = 'NOT SCHEDULED' | 'SCHEDULED' | 'COMPLETED' | 'CANCELLED';
+export type ProposalStatus = 'NOT GENERATED' | 'GENERATED' | 'SENT' | 'ACCEPTED';
+export type LeadSource = 'Phone' | 'Email' | 'Referral' | 'Website' | 'LinkedIn' | 'Other';
+
+export interface LeadRecord {
+  // Identity & Pipeline
+  leadId: string;                    // "LEAD-2026-0001"
+  status: LeadStatus;                // Initial: 'NEW'
+  leadSource: LeadSource;
+  createdDate: string;               // e.g. "Sep 4, 2026"
+  lastUpdated: string;               // ISO timestamp
+
+  // Contact
+  fullName: string;
+  companyName: string;
+  businessEmail: string;
+  phoneNumber: string;
+
+  // Facility
+  propertyAddress: string;
+  facilityType: FacilitySectorId;
+  squareFootage: number;
+  cleaningFrequency: FrequencyId;
+  selectedAddOns: AddOnServiceId[];
+  specialRequirements: string;
+  internalNotes: string;
+
+  // Estimate Snapshot (populated after calculation)
+  monthlyEstimate: number;
+  ratePerVisit: number;
+  annualContractValue: number;
+  estimatedLaborHours: number;
+  recommendedCrewSize: number;
+  estimateSnapshot?: EstimateResult;  // Full engine output
+
+  // Walkthrough (optional, independent of Lead Status)
+  walkthroughStatus: WalkthroughStatus;  // Default: 'NOT SCHEDULED'
+  walkthroughDate: string;
+  walkthroughTime: string;
+  assignedSalesRep: string;
+  meetingInstructions: string;
+  walkthroughNotes: string;
+
+  // Proposal (independent of walkthrough)
+  proposalId: string;
+  proposalStatus: ProposalStatus;     // Default: 'NOT GENERATED'
+  proposalIssueDate: string;
+  proposalValidThrough: string;
+  proposalSentDate: string;
+}
+
 export interface ProposalData {
   proposalId: string;
   createdDate: string;
@@ -159,3 +211,4 @@ export interface ProposalData {
   estimate: EstimateResult;
   specialInstructions?: string;
 }
+
