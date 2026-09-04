@@ -16,7 +16,9 @@ import {
   LeadStatus, 
   LeadSource,
   FacilitySectorId,
-  FrequencyId
+  FrequencyId,
+  AddOnServiceId,
+  EstimateResult
 } from '../../types/cleanCommand';
 import { facilitySectors, frequencyOptions } from '../../config/clientConfig';
 import { calculateCommercialEstimate } from '../../utils/pricingEngine';
@@ -26,11 +28,19 @@ interface NewLeadModalProps {
   onClose: () => void;
   onCreateLead: (lead: LeadRecord) => Promise<void> | void;
   nextLeadSequence?: number;
+  suggestedLeadId?: string;
   initialEstimateSpecs?: {
     squareFootage?: number;
     facilityType?: FacilitySectorId;
     cleaningFrequency?: FrequencyId;
     estimatedValue?: number;
+    monthlyEstimate?: number;
+    ratePerVisit?: number;
+    selectedAddOns?: AddOnServiceId[];
+    propertyType?: string;
+    specialRequirements?: string;
+    notes?: string;
+    estimateSnapshot?: EstimateResult;
   };
 }
 
@@ -58,6 +68,7 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
   onClose,
   onCreateLead,
   nextLeadSequence = 1,
+  suggestedLeadId,
   initialEstimateSpecs
 }) => {
   // Required Canonical Lead Fields
@@ -66,13 +77,13 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [projectName, setProjectName] = useState('');
-  const [projectType, setProjectType] = useState('Commercial Corporate Office');
+  const [projectType, setProjectType] = useState(initialEstimateSpecs?.propertyType || 'Commercial Corporate Office');
   const [projectLocation, setProjectLocation] = useState('');
   const [estimatedValue, setEstimatedValue] = useState<number>(initialEstimateSpecs?.estimatedValue || 25000);
   const [leadSource, setLeadSource] = useState<LeadSource>('Website');
-  const [status, setStatus] = useState<LeadStatus>('New');
-  const [notes, setNotes] = useState('');
-  const [specialRequirements, setSpecialRequirements] = useState('');
+  const [status, setStatus] = useState<LeadStatus>(initialEstimateSpecs ? 'Estimating' : 'New');
+  const [notes, setNotes] = useState(initialEstimateSpecs?.notes || '');
+  const [specialRequirements, setSpecialRequirements] = useState(initialEstimateSpecs?.specialRequirements || '');
   const [assignedSalesRep, setAssignedSalesRep] = useState('Unassigned');
 
   // Optional technical specs to connect directly to estimator
@@ -83,9 +94,38 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
+  // Dynamically pre-fill form fields whenever modal opens from an active estimate
+  React.useEffect(() => {
+    if (isOpen && initialEstimateSpecs) {
+      if (initialEstimateSpecs.squareFootage !== undefined) {
+        setSquareFootage(initialEstimateSpecs.squareFootage);
+      }
+      if (initialEstimateSpecs.facilityType) {
+        setFacilityType(initialEstimateSpecs.facilityType);
+      }
+      if (initialEstimateSpecs.cleaningFrequency) {
+        setCleaningFrequency(initialEstimateSpecs.cleaningFrequency);
+      }
+      if (initialEstimateSpecs.estimatedValue !== undefined) {
+        setEstimatedValue(initialEstimateSpecs.estimatedValue);
+      }
+      if (initialEstimateSpecs.propertyType) {
+        setProjectType(initialEstimateSpecs.propertyType);
+      }
+      if (initialEstimateSpecs.specialRequirements) {
+        setSpecialRequirements(initialEstimateSpecs.specialRequirements);
+      }
+      if (initialEstimateSpecs.notes) {
+        setNotes(initialEstimateSpecs.notes);
+      }
+      setStatus('Estimating');
+      setErrorMsg('');
+    }
+  }, [isOpen, initialEstimateSpecs]);
+
   if (!isOpen) return null;
 
-  const leadId = `LD-${new Date().getFullYear()}-${String(nextLeadSequence).padStart(3, '0')}`;
+  const leadId = suggestedLeadId || `LD-${new Date().getFullYear()}-${String(nextLeadSequence).padStart(3, '0')}`;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,12 +140,12 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
     try {
       const today = new Date().toISOString().split('T')[0];
 
-      // Calculate initial baseline estimate if squareFootage provided
-      const baselineEstimate = calculateCommercialEstimate(
+      // Use attached estimate snapshot if available, or calculate baseline
+      const baselineEstimate = initialEstimateSpecs?.estimateSnapshot || calculateCommercialEstimate(
         squareFootage,
         facilityType,
         cleaningFrequency,
-        []
+        initialEstimateSpecs?.selectedAddOns || []
       );
 
       const finalEstimatedValue = estimatedValue > 0 
@@ -132,12 +172,12 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
         lastUpdated: today,
 
         // Legacy / Estimator connection fields
-        projectName: projectName.trim() || `${companyName.trim()} Facility`,
+        projectName: projectName.trim() || `${companyName.trim() || 'Prospect'} Facility`,
         projectLocation: projectLocation.trim(),
         estimatedValue: finalEstimatedValue,
         facilityType,
-        selectedAddOns: [],
-        ratePerVisit: baselineEstimate.pricePerVisit,
+        selectedAddOns: initialEstimateSpecs?.selectedAddOns || [],
+        ratePerVisit: initialEstimateSpecs?.ratePerVisit || baselineEstimate.pricePerVisit,
         annualContractValue: finalEstimatedValue,
         estimatedLaborHours: baselineEstimate.hoursPerCleaningVisit,
         recommendedCrewSize: baselineEstimate.recommendedCrewSize,
@@ -149,14 +189,14 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
         businessEmail: email.trim(),
         phoneNumber: phone.trim(),
         internalNotes: notes.trim(),
-        monthlyEstimate: Math.round(finalEstimatedValue / 12),
+        monthlyEstimate: initialEstimateSpecs?.monthlyEstimate || Math.round(finalEstimatedValue / 12),
         createdDate: today
       };
 
       await onCreateLead(newLead);
       onClose();
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to create lead. Please check network/Apps Script and try again.');
+      setErrorMsg(err?.message || 'Failed to create lead in Google Sheets. Please check your connection and try again.');
     } finally {
       setIsSubmitting(false);
     }

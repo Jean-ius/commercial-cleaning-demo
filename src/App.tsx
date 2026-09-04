@@ -9,9 +9,8 @@ import {
   FrequencyId,
   AddOnServiceId
 } from './types/cleanCommand';
-import { defaultClientBrand } from './config/clientConfig';
-import { initialDemoLeads } from './data/demoLeads';
-import { calculateCommercialEstimate } from './utils/pricingEngine';
+import { defaultClientBrand, facilitySectors } from './config/clientConfig';
+import { calculateCommercialEstimate, formatCurrency } from './utils/pricingEngine';
 import { LoomPitchToolbar } from './components/pitch/LoomPitchToolbar';
 import { Navbar } from './components/Navbar';
 import { CorporateLanding } from './components/landing/CorporateLanding';
@@ -59,29 +58,27 @@ export const App: React.FC = () => {
   // Current view: default to 'landing' for corporate presentation
   const [currentView, setCurrentView] = useState<'sales' | 'landing' | 'proposal' | 'packages'>('landing');
 
-  // Leads CRM State
+  // Leads CRM State: starts empty or reads verified local cache
   const [leads, setLeads] = useState<LeadRecord[]>(() => {
     try {
       const cached = localStorage.getItem('cleancommand_leads_cache');
-      if (cached) {
+      if (cached !== null) {
         const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch (e) {}
-    return initialDemoLeads;
+    return [];
   });
 
-  const [activeLead, setActiveLead] = useState<LeadRecord | null>(() => {
-    return initialDemoLeads.length > 0 ? initialDemoLeads[0] : null;
-  });
+  const [activeLead, setActiveLead] = useState<LeadRecord | null>(null);
 
   // Active Estimate for Standalone or Linked Estimating
   const [activeEstimate, setActiveEstimate] = useState<EstimateResult>(() => {
     return calculateCommercialEstimate(
-      initialDemoLeads[0]?.squareFootage || 12500,
-      initialDemoLeads[0]?.facilityType || 'corporate_office',
-      initialDemoLeads[0]?.cleaningFrequency || 'business_5x',
-      initialDemoLeads[0]?.selectedAddOns || ['carpet_extraction']
+      12500,
+      'corporate_office',
+      'business_5x',
+      ['carpet_extraction']
     );
   });
 
@@ -94,11 +91,33 @@ export const App: React.FC = () => {
     facilityType?: FacilitySectorId;
     cleaningFrequency?: FrequencyId;
     estimatedValue?: number;
+    monthlyEstimate?: number;
+    ratePerVisit?: number;
+    selectedAddOns?: AddOnServiceId[];
+    propertyType?: string;
+    specialRequirements?: string;
+    notes?: string;
+    estimateSnapshot?: EstimateResult;
   } | undefined>(undefined);
+
+  // Compute next guaranteed unique Lead ID across all existing leads (e.g., LD-2026-004)
+  const generateNextLeadId = (): string => {
+    const curYear = new Date().getFullYear();
+    let maxSeq = 0;
+    leads.forEach(l => {
+      const match = String(l.leadId || '').match(/^LD-(\d{4})-(\d+)$/i);
+      if (match) {
+        const seq = parseInt(match[2], 10);
+        if (seq > maxSeq) maxSeq = seq;
+      }
+    });
+    return `LD-${curYear}-${String(maxSeq + 1).padStart(3, '0')}`;
+  };
 
   // Toast feedback
   const [toastMsg, setToastMsg] = useState<string>('');
   const [toastVisible, setToastVisible] = useState<boolean>(false);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
   const triggerToast = (msg: string) => {
     setToastMsg(msg);
@@ -110,69 +129,146 @@ export const App: React.FC = () => {
   useEffect(() => {
     let isMounted = true;
     async function initLeads() {
+      setIsSyncing(true);
       try {
         const res = await loadLeadsFromGoogleSheets(brandConfig.googleAppsScriptUrl);
-        if (isMounted && res.leads && res.leads.length > 0) {
-          setLeads(res.leads);
-          if (!activeLead) {
-            setActiveLead(res.leads[0]);
+        if (isMounted) {
+          if (res.mode === 'live') {
+            // Google Sheets is the authoritative source of truth
+            setLeads(res.leads);
+            if (res.leads.length === 0) {
+              setActiveLead(null);
+            } else if (!activeLead || !res.leads.some(l => l.leadId === activeLead.leadId)) {
+              setActiveLead(res.leads[0]);
+            }
+          } else if (res.leads && res.leads.length > 0) {
+            // Offline fallback
+            setLeads(res.leads);
+            if (!activeLead) setActiveLead(res.leads[0]);
           }
         }
       } catch (err) {
         console.warn('Could not load remote leads:', err);
+      } finally {
+        if (isMounted) setIsSyncing(false);
       }
     }
     initLeads();
     return () => { isMounted = false; };
   }, [brandConfig.googleAppsScriptUrl]);
 
-  // Lead Lifecycle Actions
-  const handleCreateLead = async (newLead: LeadRecord) => {
-    // 1. Send to Google Sheets first (Persistent Company Data Store)
-    await createLeadInGoogleSheets(newLead, brandConfig.googleAppsScriptUrl);
-
-    // 2. Only after Google Sheets write succeeds: update UI & local state
-    setLeads(prev => [newLead, ...prev]);
-    setActiveLead(newLead);
-    if (newLead.estimateSnapshot) {
-      setActiveEstimate(newLead.estimateSnapshot);
+  // Manual trigger to pull latest sheet changes or deletions
+  const handleSyncFromGoogleSheets = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await loadLeadsFromGoogleSheets(brandConfig.googleAppsScriptUrl);
+      if (res.mode === 'live') {
+        setLeads(res.leads);
+        if (res.leads.length === 0) {
+          setActiveLead(null);
+        } else if (!activeLead || !res.leads.some(l => l.leadId === activeLead.leadId)) {
+          setActiveLead(res.leads[0]);
+        }
+        triggerToast(`Google Sheets Synced: ${res.leads.length} active leads in pipeline`);
+      } else {
+        triggerToast('Could not reach Google Sheets. Offline cache active.');
+      }
+    } catch (err: any) {
+      triggerToast('Sync error: ' + (err?.message || 'Check network connection'));
+    } finally {
+      setIsSyncing(false);
     }
-    triggerToast(`Created lead ${newLead.leadId} for ${newLead.companyName}!`);
+  };
 
-    // 3. Reconcile from Google Sheets to confirm full database parity
+  // Lead Lifecycle Actions: BUG 2 ATOMIC SEQUENCE FOR SAVE TO NEW LEAD
+  const handleCreateLead = async (newLead: LeadRecord) => {
+    // 1. Validate Lead data
+    if (!newLead.companyName?.trim() && !newLead.contactPerson?.trim()) {
+      throw new Error('Please provide a Company Name or Contact Person.');
+    }
+
+    // 2. Write new Lead to Google Sheets first (Persistent Company Data Store)
+    const createRes = await createLeadInGoogleSheets(newLead, brandConfig.googleAppsScriptUrl);
+    if (!createRes.success) {
+      throw new Error(createRes.error || 'Failed to create lead in Google Sheets.');
+    }
+
+    const confirmedLeadId = createRes.leadId || newLead.leadId;
+
+    // 3. If an estimate was attached, save estimate specifically with the confirmed Lead ID
+    if (newLead.estimateSnapshot) {
+      try {
+        await saveEstimateToGoogleSheets(confirmedLeadId, {
+          estimatedValue: newLead.estimateSnapshot.annualContractValue,
+          monthlyEstimate: newLead.estimateSnapshot.totalEstimatedMonthlyInvestment,
+          ratePerVisit: newLead.estimateSnapshot.pricePerVisit,
+          annualContractValue: newLead.estimateSnapshot.annualContractValue,
+          estimatedLaborHours: newLead.estimateSnapshot.hoursPerCleaningVisit,
+          recommendedCrewSize: newLead.estimateSnapshot.recommendedCrewSize,
+          squareFootage: newLead.squareFootage,
+          facilityType: newLead.facilityType,
+          cleaningFrequency: newLead.cleaningFrequency,
+          selectedAddOns: newLead.selectedAddOns,
+          status: 'Estimating'
+        }, brandConfig.googleAppsScriptUrl);
+      } catch (estErr: any) {
+        console.warn('Lead created but estimate save encountered warning:', estErr);
+      }
+    }
+
+    // 4. Refresh full leads dataset from Google Sheets to confirm complete persistence
+    let finalLead: LeadRecord = { ...newLead, leadId: confirmedLeadId };
     try {
       const fresh = await loadLeadsFromGoogleSheets(brandConfig.googleAppsScriptUrl);
-      if (fresh.leads && fresh.leads.length > 0) {
+      if (fresh.mode === 'live') {
         setLeads(fresh.leads);
+        const reloaded = fresh.leads.find(l => l.leadId === confirmedLeadId);
+        if (reloaded) {
+          finalLead = { ...reloaded, estimateSnapshot: newLead.estimateSnapshot };
+        }
+      } else {
+        setLeads(prev => [finalLead, ...prev]);
       }
     } catch {
-      // background reconcile non-fatal
+      setLeads(prev => [finalLead, ...prev]);
     }
+
+    setActiveLead(finalLead);
+    if (finalLead.estimateSnapshot) {
+      setActiveEstimate(finalLead.estimateSnapshot);
+    }
+    triggerToast(`Created new lead ${confirmedLeadId} for ${finalLead.companyName} in Google Sheets!`);
   };
 
   const handleUpdateLead = async (updatedLead: LeadRecord) => {
     // 1. Send update to Google Sheets first
     await updateLeadInGoogleSheets(updatedLead, brandConfig.googleAppsScriptUrl);
 
-    // 2. Only after Google Sheets write succeeds: update UI & local state
-    setLeads(prev => prev.map(l => l.leadId === updatedLead.leadId ? updatedLead : l));
-    if (activeLead && activeLead.leadId === updatedLead.leadId) {
-      setActiveLead(updatedLead);
-    }
-    triggerToast(`Updated lead ${updatedLead.leadId} (${updatedLead.companyName}) in Google Sheets!`);
-
-    // 3. Reconcile from Google Sheets
+    // 2. Only after Google Sheets write succeeds: refresh from Google Sheets
     try {
       const fresh = await loadLeadsFromGoogleSheets(brandConfig.googleAppsScriptUrl);
-      if (fresh.leads && fresh.leads.length > 0) {
+      if (fresh.mode === 'live') {
         setLeads(fresh.leads);
+        const reloaded = fresh.leads.find(l => l.leadId === updatedLead.leadId);
+        if (reloaded) {
+          setActiveLead({ ...reloaded, estimateSnapshot: updatedLead.estimateSnapshot || activeEstimate });
+        }
+      } else {
+        setLeads(prev => prev.map(l => l.leadId === updatedLead.leadId ? updatedLead : l));
+        if (activeLead && activeLead.leadId === updatedLead.leadId) {
+          setActiveLead(updatedLead);
+        }
       }
     } catch {
-      // background reconcile non-fatal
+      setLeads(prev => prev.map(l => l.leadId === updatedLead.leadId ? updatedLead : l));
+      if (activeLead && activeLead.leadId === updatedLead.leadId) {
+        setActiveLead(updatedLead);
+      }
     }
+    triggerToast(`Updated lead ${updatedLead.leadId} (${updatedLead.companyName}) in Google Sheets!`);
   };
 
-  // Save estimate specifically to an existing lead by Lead ID
+  // BUG 1 ATOMIC SEQUENCE: Save estimate specifically to an existing lead by Lead ID
   const handleSaveEstimateToLead = async (
     targetLeadId: string,
     estimate: EstimateResult,
@@ -188,25 +284,8 @@ export const App: React.FC = () => {
       throw new Error(`Lead ${targetLeadId} could not be located in records.`);
     }
 
-    const updatedLead: LeadRecord = {
-      ...targetLead,
-      squareFootage: facilitySpecs.squareFootage,
-      facilityType: facilitySpecs.facilityType,
-      cleaningFrequency: facilitySpecs.cleaningFrequency,
-      selectedAddOns: facilitySpecs.selectedAddOns,
-      estimatedValue: estimate.annualContractValue,
-      ratePerVisit: estimate.pricePerVisit,
-      annualContractValue: estimate.annualContractValue,
-      estimatedLaborHours: estimate.hoursPerCleaningVisit,
-      recommendedCrewSize: estimate.recommendedCrewSize,
-      estimateSnapshot: estimate,
-      status: targetLead.status === 'New' ? 'Estimating' : targetLead.status,
-      updatedDate: new Date().toISOString().split('T')[0],
-      lastUpdated: new Date().toISOString().split('T')[0],
-      monthlyEstimate: estimate.totalEstimatedMonthlyInvestment
-    };
-
     try {
+      // 1. Write estimate updates directly to Google Sheets matching targetLead.leadId
       await saveEstimateToGoogleSheets(targetLead.leadId, {
         estimatedValue: estimate.annualContractValue,
         monthlyEstimate: estimate.totalEstimatedMonthlyInvestment,
@@ -218,13 +297,50 @@ export const App: React.FC = () => {
         facilityType: facilitySpecs.facilityType,
         cleaningFrequency: facilitySpecs.cleaningFrequency,
         selectedAddOns: facilitySpecs.selectedAddOns,
-        status: updatedLead.status
+        status: targetLead.status === 'New' ? 'Estimating' : targetLead.status
       }, brandConfig.googleAppsScriptUrl);
+
+      // 2. Reconcile / Refresh directly from Google Sheets (MANDATORY REQUIREMENT 8)
+      let refreshedLead: LeadRecord | undefined;
+      try {
+        const fresh = await loadLeadsFromGoogleSheets(brandConfig.googleAppsScriptUrl);
+        if (fresh.mode === 'live') {
+          setLeads(fresh.leads);
+          refreshedLead = fresh.leads.find(l => l.leadId === targetLead.leadId);
+        }
+      } catch (refreshErr) {
+        console.warn('Post-save Google Sheets refresh note:', refreshErr);
+      }
+
+      const updatedLead: LeadRecord = refreshedLead ? {
+        ...refreshedLead,
+        estimateSnapshot: estimate
+      } : {
+        ...targetLead,
+        squareFootage: facilitySpecs.squareFootage,
+        facilityType: facilitySpecs.facilityType,
+        cleaningFrequency: facilitySpecs.cleaningFrequency,
+        selectedAddOns: facilitySpecs.selectedAddOns,
+        estimatedValue: estimate.annualContractValue,
+        ratePerVisit: estimate.pricePerVisit,
+        annualContractValue: estimate.annualContractValue,
+        estimatedLaborHours: estimate.hoursPerCleaningVisit,
+        recommendedCrewSize: estimate.recommendedCrewSize,
+        estimateSnapshot: estimate,
+        status: targetLead.status === 'New' ? 'Estimating' : targetLead.status,
+        updatedDate: new Date().toISOString().split('T')[0],
+        lastUpdated: new Date().toISOString().split('T')[0],
+        monthlyEstimate: estimate.totalEstimatedMonthlyInvestment
+      };
 
       setActiveLead(updatedLead);
       setActiveEstimate(estimate);
-      setLeads(prev => prev.map(l => l.leadId === updatedLead.leadId ? updatedLead : l));
-      triggerToast(`Saved estimate ($${estimate.totalEstimatedMonthlyInvestment}/mo) to ${updatedLead.companyName} (${updatedLead.leadId})!`);
+      if (!refreshedLead) {
+        setLeads(prev => prev.map(l => l.leadId === updatedLead.leadId ? updatedLead : l));
+      }
+
+      // 3. Show success ONLY after successful synchronization (MANDATORY REQUIREMENT 9)
+      triggerToast(`Saved estimate ($${formatCurrency(estimate.totalEstimatedMonthlyInvestment)}/mo) to ${updatedLead.companyName} (${updatedLead.leadId}) in Google Sheets!`);
     } catch (e: any) {
       triggerToast(`Failed to save estimate to Google Sheets: ${e?.message || 'Error'}`);
       throw e;
@@ -244,7 +360,7 @@ export const App: React.FC = () => {
     await handleSaveEstimateToLead(activeLead.leadId, estimate, facilitySpecs);
   };
 
-  // Convert standalone estimate to a new lead
+  // Convert estimate to a new lead with all pre-filled estimator information
   const handleSaveAsNewLead = (
     estimate: EstimateResult,
     facilitySpecs: {
@@ -255,20 +371,34 @@ export const App: React.FC = () => {
     }
   ) => {
     setActiveEstimate(estimate);
+    const sectorObj = facilitySectors.find(s => s.id === facilitySpecs.facilityType);
+    const sectorLabel = sectorObj ? sectorObj.name : 'Commercial Office';
+    const addOnList = facilitySpecs.selectedAddOns.length > 0
+      ? `Add-ons: ${facilitySpecs.selectedAddOns.join(', ')}`
+      : '';
+    const summaryNotes = `Commercial cleaning estimate: ${facilitySpecs.squareFootage.toLocaleString()} sq ft, ${facilitySpecs.cleaningFrequency}. ${addOnList}`;
+
     setInitialSpecsForNewLead({
       squareFootage: facilitySpecs.squareFootage,
       facilityType: facilitySpecs.facilityType,
       cleaningFrequency: facilitySpecs.cleaningFrequency,
-      estimatedValue: estimate.annualContractValue
+      estimatedValue: estimate.annualContractValue,
+      monthlyEstimate: estimate.totalEstimatedMonthlyInvestment,
+      ratePerVisit: estimate.pricePerVisit,
+      selectedAddOns: facilitySpecs.selectedAddOns,
+      propertyType: sectorLabel,
+      specialRequirements: addOnList,
+      notes: summaryNotes,
+      estimateSnapshot: estimate
     });
     setIsNewLeadModalOpen(true);
   };
 
-  // Save calculation standalone without any lead
+  // Save calculation standalone without any lead (WORKFLOW 3)
   const handleSaveStandalone = (estimate: EstimateResult) => {
     setActiveEstimate(estimate);
     setActiveLead(null);
-    triggerToast(`Estimate saved standalone ($${estimate.totalEstimatedMonthlyInvestment}/mo). Ready for proposal.`);
+    triggerToast(`Estimate saved standalone ($${formatCurrency(estimate.totalEstimatedMonthlyInvestment)}/mo). Ready for proposal.`);
   };
 
   // Reset/Clear active lead so user can start an independent estimate for another company
@@ -448,6 +578,8 @@ export const App: React.FC = () => {
               leads={leads}
               activeLead={activeLead}
               brandConfig={brandConfig}
+              isSyncing={isSyncing}
+              onSyncFromGoogleSheets={handleSyncFromGoogleSheets}
               onSelectLead={(lead) => {
                 setActiveLead(lead);
                 if (lead.estimateSnapshot) setActiveEstimate(lead.estimateSnapshot);
@@ -523,7 +655,7 @@ export const App: React.FC = () => {
         isOpen={isNewLeadModalOpen}
         onClose={() => setIsNewLeadModalOpen(false)}
         onCreateLead={handleCreateLead}
-        nextLeadSequence={leads.length + 1}
+        suggestedLeadId={generateNextLeadId()}
         initialEstimateSpecs={initialSpecsForNewLead}
       />
 

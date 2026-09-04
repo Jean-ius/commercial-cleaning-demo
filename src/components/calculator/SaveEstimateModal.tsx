@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Users, 
@@ -21,12 +21,13 @@ interface SaveEstimateModalProps {
   estimate: EstimateResult;
   specs: {
     squareFootage: number;
-    facilityType: string;
-    cleaningFrequency: string;
+    facilityType: any;
+    cleaningFrequency: any;
+    selectedAddOns: any[];
   };
-  leads: LeadRecord[];
+  leads?: LeadRecord[];
   activeLead?: LeadRecord | null;
-  onConfirmSaveToExisting: (leadId: string) => Promise<void>;
+  onConfirmSaveToExisting: (leadId: string) => Promise<void> | void;
   onConfirmSaveToNew: () => void;
   onConfirmSaveStandalone: () => void;
 }
@@ -42,12 +43,31 @@ export const SaveEstimateModal: React.FC<SaveEstimateModalProps> = ({
   onConfirmSaveToNew,
   onConfirmSaveStandalone
 }) => {
-  // If activeLead exists, default to 'existing', otherwise default to 'new'
-  const [mode, setMode] = useState<SaveDestinationMode>(activeLead ? 'existing' : 'new');
+  // If activeLead exists and leads exist, default to 'existing', otherwise default to 'new'
+  const hasExistingLeads = Boolean(leads && leads.length > 0);
+  const [mode, setMode] = useState<SaveDestinationMode>(hasExistingLeads && activeLead ? 'existing' : 'new');
   const [selectedLeadId, setSelectedLeadId] = useState<string>(activeLead?.leadId || (leads[0]?.leadId || ''));
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>('');
+
+  // Dynamically synchronize mode and selection when modal opens or leads update
+  useEffect(() => {
+    if (isOpen) {
+      if (!leads || leads.length === 0) {
+        setMode('new');
+        setSelectedLeadId('');
+      } else if (activeLead && leads.some(l => l.leadId === activeLead.leadId)) {
+        setMode('existing');
+        setSelectedLeadId(activeLead.leadId);
+      } else {
+        setMode('new');
+        setSelectedLeadId(leads[0]?.leadId || '');
+      }
+      setErrorMsg('');
+      setSearchTerm('');
+    }
+  }, [isOpen, activeLead, leads]);
 
   if (!isOpen) return null;
 
@@ -145,11 +165,20 @@ export const SaveEstimateModal: React.FC<SaveEstimateModalProps> = ({
           
           {/* OPTION 1: Save to Existing Lead */}
           <div 
-            onClick={() => setMode('existing')}
+            onClick={() => {
+              if (!leads || leads.length === 0) {
+                setErrorMsg('There are no existing leads in Google Sheet. Please select "Save to New Lead" below.');
+                setMode('new');
+                return;
+              }
+              setMode('existing');
+            }}
             className={`p-4 rounded-2xl border-2 transition-all cursor-pointer ${
-              mode === 'existing' 
-                ? 'border-blue-600 bg-blue-50/50 shadow-sm' 
-                : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50/60'
+              !leads || leads.length === 0
+                ? 'opacity-60 border-slate-200 bg-slate-50/70 cursor-not-allowed'
+                : mode === 'existing' 
+                  ? 'border-blue-600 bg-blue-50/50 shadow-sm' 
+                  : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50/60'
             }`}
           >
             <div className="flex items-start gap-3.5">
@@ -162,14 +191,20 @@ export const SaveEstimateModal: React.FC<SaveEstimateModalProps> = ({
                 <div className="flex items-center gap-2">
                   <Users className="w-4 h-4 text-blue-600" />
                   <span className="text-sm font-bold text-slate-900">Save to Existing Lead</span>
-                  {activeLead && (
+                  {(!leads || leads.length === 0) ? (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600 border border-slate-300">
+                      0 leads in Google Sheet
+                    </span>
+                  ) : activeLead ? (
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">
                       Loaded: {activeLead.leadId}
                     </span>
-                  )}
+                  ) : null}
                 </div>
                 <p className="text-xs text-slate-500 mt-1">
-                  Attach this calculation to an existing prospect or company in your pipeline.
+                  {(!leads || leads.length === 0)
+                    ? 'No existing leads in Google Sheet. Select "Save to New Lead" below to create one.'
+                    : 'Attach this calculation to an existing prospect or company in your pipeline.'}
                 </p>
 
                 {/* Sub-section: Existing Leads Search & List (Shown when active) */}

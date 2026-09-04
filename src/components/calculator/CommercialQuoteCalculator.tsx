@@ -544,7 +544,8 @@ export const CommercialQuoteCalculator: React.FC<CommercialQuoteCalculatorProps>
         specs={{
           squareFootage,
           facilityType: activeSector.name,
-          cleaningFrequency: frequencyOptions.find(f => f.id === selectedFrequencyId)?.label || selectedFrequencyId
+          cleaningFrequency: frequencyOptions.find(f => f.id === selectedFrequencyId)?.label || selectedFrequencyId,
+          selectedAddOns
         }}
         leads={leads}
         activeLead={activeLead}

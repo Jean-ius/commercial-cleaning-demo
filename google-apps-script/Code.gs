@@ -3,7 +3,7 @@
  * COMMERCIAL CLEANING SALES & ESTIMATING SYSTEM - GOOGLE SHEETS BACKEND
  * =========================================================================
  * 
- * CANONICAL SCHEMA (16 COLUMNS):
+ * CANONICAL SCHEMA (19 COLUMNS):
  * 1.  Lead ID
  * 2.  Lead Source
  * 3.  Company Name
@@ -17,23 +17,25 @@
  * 11. Special Requirements
  * 12. Assigned Sales Rep
  * 13. Status
- * 14. Notes
- * 15. Date Created
- * 16. Last Updated
+ * 14. Monthly Estimate
+ * 15. Annual Value
+ * 16. Rate Per Visit
+ * 17. Notes
+ * 18. Date Created
+ * 19. Last Updated
  * 
- * FEATURES:
- * - Dynamic Header Mapping: Writes/reads by header name, resilient to column order differences.
- * - Center Alignment: Horizontal & vertical middle centering on all cells.
- * - Full Text Visibility: Text wrapping enabled (setWrap: true) with generous column widths.
- * - Direct Target Sheet Binding: Configured for target spreadsheet ID 15lDGthD8xdEIv0DlK5GhHGyCJdBe0-jBqtnDX4zeaOM.
- * - Explicit Error Handling: Returns JSON with detailed error if lead not found or write fails.
+ * KEY ARCHITECTURAL FEATURES:
+ * - Self-Healing Schema (ensureCanonicalHeaders): Automatically detects missing pricing
+ *   columns in existing sheets and seamlessly inserts them after Status without data loss.
+ * - Server-Verified Uniqueness (getNextUniqueLeadId): Scans sheet to ensure Lead IDs never collide.
+ * - Strict Synchronization: Returns explicit error responses if lead ID not found (no silent swallow).
+ * - Full Currency & Centering Formatting: Center-aligned cells with wrap enabled and $#,##0 formatting.
  * 
  * SETUP INSTRUCTIONS:
  * 1. In your Google Sheet, click: Extensions > Apps Script.
  * 2. Replace all code in Code.gs with this script.
  * 3. Click Save (Ctrl+S).
  * 4. Select "setupSpreadsheet" from the toolbar dropdown and click "Run".
- *    -> Sets up canonical headers, centering, and column widths.
  * 5. Click Deploy > Manage Deployments > Edit > New version > Deploy.
  */
 
@@ -59,6 +61,9 @@ var LEADS_HEADERS = [
   "Special Requirements",
   "Assigned Sales Rep",
   "Status",
+  "Monthly Estimate",
+  "Annual Value",
+  "Rate Per Visit",
   "Notes",
   "Date Created",
   "Last Updated"
@@ -79,6 +84,9 @@ var COLUMN_WIDTHS = [
   260, // Special Requirements
   180, // Assigned Sales Rep
   140, // Status
+  160, // Monthly Estimate
+  160, // Annual Value
+  140, // Rate Per Visit
   320, // Notes
   130, // Date Created
   140  // Last Updated
@@ -154,7 +162,28 @@ var HEADER_ALIAS_MAP = {
   
   "status": "status",
   "leadstatus": "status",
-  
+
+  // Extended estimator & pricing mappings
+  "monthlyestimate": "monthlyEstimate",
+  "monthly": "monthlyEstimate",
+  "monthlyrate": "monthlyEstimate",
+  "monthlyinvestment": "monthlyEstimate",
+  "monthlycost": "monthlyEstimate",
+  "monthlyprice": "monthlyEstimate",
+
+  "annualvalue": "estimatedValue",
+  "annualcontractvalue": "estimatedValue",
+  "estimatedvalue": "estimatedValue",
+  "annual": "estimatedValue",
+  "annualestimate": "estimatedValue",
+  "annualinvestment": "estimatedValue",
+
+  "ratepervisit": "ratePerVisit",
+  "pricepervisit": "ratePerVisit",
+  "costpervisit": "ratePerVisit",
+  "pervisit": "ratePerVisit",
+  "cleaningrate": "ratePerVisit",
+
   "notes": "notes",
   "internalnotes": "notes",
   
@@ -166,10 +195,6 @@ var HEADER_ALIAS_MAP = {
   "updateddate": "lastUpdated",
   "updatedat": "lastUpdated",
 
-  // Extended estimator mappings if present in sheet
-  "estimatedvalue": "estimatedValue",
-  "annualcontractvalue": "estimatedValue",
-  "monthlyestimate": "monthlyEstimate",
   "proposalid": "proposalId"
 };
 
@@ -213,6 +238,74 @@ function getSheetColumnMap(sheet) {
 }
 
 /**
+ * Self-healing schema validation: ensures the sheet has canonical headers without corrupting existing data
+ */
+function ensureCanonicalHeaders(sheet) {
+  var lastCol = sheet.getLastColumn();
+  var lastRow = sheet.getLastRow();
+
+  if (lastRow < 1 || lastCol < 1) {
+    sheet.appendRow(LEADS_HEADERS);
+    return;
+  }
+
+  var existingHeaders = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var colMap = {};
+  for (var i = 0; i < existingHeaders.length; i++) {
+    var norm = String(existingHeaders[i] || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    var canonical = HEADER_ALIAS_MAP[norm];
+    if (canonical) colMap[canonical] = i + 1;
+  }
+
+  // If monthlyEstimate is missing, insert 3 columns after Status (or append)
+  if (!colMap.monthlyEstimate) {
+    var statCol = colMap.status || 13;
+    sheet.insertColumnsAfter(statCol, 3);
+    sheet.getRange(1, 1, 1, LEADS_HEADERS.length).setValues([LEADS_HEADERS]);
+    
+    // Style headers
+    sheet.getRange(1, 1, 1, LEADS_HEADERS.length)
+      .setBackground("#0F172A")
+      .setFontColor("#FFFFFF")
+      .setFontWeight("bold")
+      .setHorizontalAlignment("center")
+      .setVerticalAlignment("middle")
+      .setWrap(true);
+    sheet.setRowHeight(1, 42);
+    sheet.setFrozenRows(1);
+    
+    for (var w = 0; w < COLUMN_WIDTHS.length; w++) {
+      sheet.setColumnWidth(w + 1, COLUMN_WIDTHS[w]);
+    }
+  }
+}
+
+/**
+ * Scan sheet to compute the next guaranteed unique Lead ID (e.g., LD-2026-004)
+ */
+function getNextUniqueLeadId(sheet, leadIdCol) {
+  var col = leadIdCol || 1;
+  var numRows = sheet.getLastRow();
+  var curYear = new Date().getFullYear();
+  var maxSeq = 0;
+
+  if (numRows >= 2) {
+    var ids = sheet.getRange(1, col, numRows, 1).getValues();
+    for (var r = 1; r < ids.length; r++) {
+      var idStr = String(ids[r][0] || '').trim();
+      var match = idStr.match(/^LD-(\d{4})-(\d+)$/i);
+      if (match) {
+        var seq = parseInt(match[2], 10);
+        if (seq > maxSeq) maxSeq = seq;
+      }
+    }
+  }
+
+  var nextSeq = maxSeq + 1;
+  return "LD-" + curYear + "-" + String(nextSeq).padStart(3, "0");
+}
+
+/**
  * Run setupSpreadsheet once to configure canonical headers, center alignment, and generous column widths
  */
 function setupSpreadsheet() {
@@ -220,27 +313,7 @@ function setupSpreadsheet() {
 
   // 1. Setup LEADS Sheet
   var leadsSheet = ss.getSheetByName(SHEET_NAMES.LEADS) || ss.insertSheet(SHEET_NAMES.LEADS, 0);
-  
-  // If sheet is empty or has mismatched headers, set canonical headers
-  var lastCol = leadsSheet.getLastColumn();
-  var needsNewHeaders = false;
-  if (lastCol < LEADS_HEADERS.length) {
-    needsNewHeaders = true;
-  } else {
-    var existingHeaders = leadsSheet.getRange(1, 1, 1, lastCol).getValues()[0];
-    var normFirst = String(existingHeaders[0] || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    if (normFirst !== "leadid" && normFirst !== "id") {
-      needsNewHeaders = true;
-    }
-  }
-
-  if (needsNewHeaders) {
-    leadsSheet.clear();
-    leadsSheet.appendRow(LEADS_HEADERS);
-  } else {
-    // Ensure canonical headers are written to row 1
-    leadsSheet.getRange(1, 1, 1, LEADS_HEADERS.length).setValues([LEADS_HEADERS]);
-  }
+  ensureCanonicalHeaders(leadsSheet);
 
   // Header Styling: Navy Dark Background, Bold White Text, Centered
   var headerRange = leadsSheet.getRange(1, 1, 1, LEADS_HEADERS.length);
@@ -278,6 +351,9 @@ function setupSpreadsheet() {
   var repCol = colMap.assignedSalesRep || 12;
   var statCol = colMap.status || 13;
   var sqftCol = colMap.squareFootage || 9;
+  var monthlyCol = colMap.monthlyEstimate || 14;
+  var annualCol = colMap.estimatedValue || 15;
+  var rateCol = colMap.ratePerVisit || 16;
 
   // Status dropdown validation (Col 13 / M) - Centered
   var statRule = SpreadsheetApp.newDataValidation()
@@ -285,7 +361,7 @@ function setupSpreadsheet() {
     .build();
   leadsSheet.getRange(2, statCol, 999, 1).setDataValidation(statRule).setHorizontalAlignment("center");
 
-  // Assigned Sales Rep dropdown validation (Col 12 / L) - Centered (allows suggestions + custom values)
+  // Assigned Sales Rep dropdown validation (Col 12 / L) - Centered
   var repRule = SpreadsheetApp.newDataValidation()
     .requireValueInList(["Unassigned", "Completed", "Scheduled", "Not Scheduled", "Cancelled", "Marcus Vance", "CleanCommand Sales"], true)
     .setAllowInvalid(true)
@@ -294,6 +370,15 @@ function setupSpreadsheet() {
 
   // Format Square Footage as number with comma separator (Col 9)
   leadsSheet.getRange(2, sqftCol, 999, 1).setNumberFormat("#,##0").setHorizontalAlignment("center");
+
+  // Format Monthly Estimate as currency ($#,##0)
+  leadsSheet.getRange(2, monthlyCol, 999, 1).setNumberFormat("$#,##0").setHorizontalAlignment("center");
+
+  // Format Annual Value as currency ($#,##0)
+  leadsSheet.getRange(2, annualCol, 999, 1).setNumberFormat("$#,##0").setHorizontalAlignment("center");
+
+  // Format Rate Per Visit as currency with cents ($#,##0.00)
+  leadsSheet.getRange(2, rateCol, 999, 1).setNumberFormat("$#,##0.00").setHorizontalAlignment("center");
 
   // -------------------------------------------------------------
   // CONDITIONAL FORMATTING: Status & Assigned Sales Rep Color System
@@ -315,7 +400,7 @@ function setupSpreadsheet() {
     { text: "Lost", bg: "#FFE4E6", fg: "#BE123C" },
     { text: "LOST", bg: "#FFE4E6", fg: "#BE123C" },
     
-    // 2. Scheduling & Execution Statuses (Applies to both Rep and Status columns)
+    // 2. Scheduling & Execution Statuses
     { text: "Completed", bg: "#DCFCE7", fg: "#15803D" },
     { text: "COMPLETED", bg: "#DCFCE7", fg: "#15803D" },
     { text: "Scheduled", bg: "#E0F2FE", fg: "#0369A1" },
@@ -470,19 +555,29 @@ function doPost(e) {
     if (!leadsSheet) {
       setupSpreadsheet();
       leadsSheet = ss.getSheetByName(SHEET_NAMES.LEADS);
+    } else {
+      ensureCanonicalHeaders(leadsSheet);
     }
 
     // -----------------------------------------------------------------
     // ACTION: CREATE LEAD
     // -----------------------------------------------------------------
     if (action === "create_lead") {
-      var leadId = data.leadId || ("LD-" + new Date().getFullYear() + "-" + Math.floor(100 + Math.random() * 900));
-      var today = new Date().toISOString().split("T")[0];
-      var nowStr = new Date().toLocaleString();
-
       var colInfo = getSheetColumnMap(leadsSheet);
       var keyMap = colInfo.keyToCol;
+      var leadIdCol = keyMap["leadId"] || 1;
       var totalCols = Math.max(leadsSheet.getLastColumn(), LEADS_HEADERS.length);
+
+      var requestedLeadId = data.leadId ? String(data.leadId).trim() : "";
+      var leadId = requestedLeadId;
+
+      // Ensure uniqueness: if requestedLeadId is already in use or empty, generate next unique ID
+      if (!leadId || findLeadRow(leadsSheet, leadId, leadIdCol) >= 2) {
+        leadId = getNextUniqueLeadId(leadsSheet, leadIdCol);
+      }
+
+      var today = new Date().toISOString().split("T")[0];
+      var nowStr = new Date().toLocaleString();
 
       // Construct normalized row based on actual sheet headers
       var rowData = new Array(totalCols);
@@ -490,7 +585,6 @@ function doPost(e) {
         rowData[c] = "";
       }
 
-      // Map values directly to their resolved columns
       function assignVal(key, val) {
         if (keyMap[key] && keyMap[key] <= totalCols) {
           rowData[keyMap[key] - 1] = val !== undefined ? val : "";
@@ -510,12 +604,19 @@ function doPost(e) {
       assignVal("specialRequirements", data.specialRequirements || "");
       assignVal("assignedSalesRep", data.assignedSalesRep || "Unassigned");
       assignVal("status", data.status || "New");
+
+      // Pricing values
+      var estVal = Number(data.estimatedValue || data.annualContractValue) || 0;
+      var monthlyVal = Number(data.monthlyEstimate) || (estVal > 0 ? Math.round(estVal / 12) : 0);
+      var rateVal = Number(data.ratePerVisit) || 0;
+
+      assignVal("monthlyEstimate", monthlyVal);
+      assignVal("estimatedValue", estVal);
+      assignVal("ratePerVisit", rateVal);
+
       assignVal("notes", data.notes || data.internalNotes || "");
       assignVal("dateCreated", data.dateCreated || today);
       assignVal("lastUpdated", data.lastUpdated || today);
-
-      // Extended fields if column exists
-      assignVal("estimatedValue", Number(data.estimatedValue || data.annualContractValue) || 0);
       assignVal("proposalId", data.proposalId || "");
 
       leadsSheet.appendRow(rowData);
@@ -534,8 +635,14 @@ function doPost(e) {
       if (keyMap["squareFootage"]) {
         leadsSheet.getRange(newRowIdx, keyMap["squareFootage"]).setNumberFormat("#,##0").setHorizontalAlignment("center");
       }
+      if (keyMap["monthlyEstimate"]) {
+        leadsSheet.getRange(newRowIdx, keyMap["monthlyEstimate"]).setNumberFormat("$#,##0").setHorizontalAlignment("center");
+      }
       if (keyMap["estimatedValue"]) {
         leadsSheet.getRange(newRowIdx, keyMap["estimatedValue"]).setNumberFormat("$#,##0").setHorizontalAlignment("center");
+      }
+      if (keyMap["ratePerVisit"]) {
+        leadsSheet.getRange(newRowIdx, keyMap["ratePerVisit"]).setNumberFormat("$#,##0.00").setHorizontalAlignment("center");
       }
 
       // Log activity
@@ -548,7 +655,7 @@ function doPost(e) {
           "",
           data.status || "New",
           data.assignedSalesRep || "System",
-          "Created lead record for " + (data.companyName || "Prospect")
+          "Created lead record for " + (data.companyName || "Prospect") + " ($" + monthlyVal + "/mo)"
         ]);
         var logIdx = logSheet.getLastRow();
         logSheet.getRange(logIdx, 1, 1, ACTIVITY_LOG_HEADERS.length)
@@ -568,7 +675,7 @@ function doPost(e) {
     // ACTION: UPDATE LEAD
     // -----------------------------------------------------------------
     if (action === "update_lead") {
-      var targetLeadId = data.leadId;
+      var targetLeadId = data.leadId ? String(data.leadId).trim() : "";
       if (!targetLeadId) {
         return ContentService.createTextOutput(JSON.stringify({ 
           success: false, 
@@ -627,16 +734,34 @@ function doPost(e) {
         updateField("notes", data.notes !== undefined ? data.notes : data.internalNotes);
       }
 
-      // Always update Last Updated
-      updateField("lastUpdated", data.lastUpdated || todayStr);
-
-      // Extended
+      // Pricing updates
+      if (data.monthlyEstimate !== undefined) {
+        updateField("monthlyEstimate", Number(data.monthlyEstimate));
+        if (keyMapU["monthlyEstimate"]) {
+          leadsSheet.getRange(targetRow, keyMapU["monthlyEstimate"]).setNumberFormat("$#,##0").setHorizontalAlignment("center");
+        }
+      }
       if (data.estimatedValue !== undefined || data.annualContractValue !== undefined) {
-        updateField("estimatedValue", Number(data.estimatedValue || data.annualContractValue));
+        var uAnnual = Number(data.estimatedValue || data.annualContractValue);
+        updateField("estimatedValue", uAnnual);
         if (keyMapU["estimatedValue"]) {
           leadsSheet.getRange(targetRow, keyMapU["estimatedValue"]).setNumberFormat("$#,##0").setHorizontalAlignment("center");
         }
+        if (data.monthlyEstimate === undefined && keyMapU["monthlyEstimate"] && uAnnual > 0) {
+          updateField("monthlyEstimate", Math.round(uAnnual / 12));
+          leadsSheet.getRange(targetRow, keyMapU["monthlyEstimate"]).setNumberFormat("$#,##0").setHorizontalAlignment("center");
+        }
       }
+      if (data.ratePerVisit !== undefined) {
+        updateField("ratePerVisit", Number(data.ratePerVisit));
+        if (keyMapU["ratePerVisit"]) {
+          leadsSheet.getRange(targetRow, keyMapU["ratePerVisit"]).setNumberFormat("$#,##0.00").setHorizontalAlignment("center");
+        }
+      }
+
+      // Always update Last Updated
+      updateField("lastUpdated", data.lastUpdated || todayStr);
+
       if (data.proposalId !== undefined) updateField("proposalId", data.proposalId);
 
       // Re-apply centering and wrapping
@@ -671,7 +796,7 @@ function doPost(e) {
     // ACTION: UPDATE STATUS
     // -----------------------------------------------------------------
     if (action === "update_status") {
-      var sLeadId = data.leadId;
+      var sLeadId = data.leadId ? String(data.leadId).trim() : "";
       var newStatus = data.status;
       if (!sLeadId || !newStatus) {
         return ContentService.createTextOutput(JSON.stringify({ 
@@ -688,7 +813,7 @@ function doPost(e) {
       if (sRow < 2) {
         return ContentService.createTextOutput(JSON.stringify({ 
           success: false, 
-          error: "Lead ID '" + sLeadId + "' not found" 
+          error: "Lead ID '" + sLeadId + "' not found in Google Sheet" 
         })).setMimeType(ContentService.MimeType.JSON);
       }
 
@@ -724,50 +849,108 @@ function doPost(e) {
     // ACTION: SAVE ESTIMATE
     // -----------------------------------------------------------------
     if (action === "save_estimate") {
-      var eLeadId = data.leadId;
+      var eLeadId = data.leadId ? String(data.leadId).trim() : "";
+      if (!eLeadId) {
+        return ContentService.createTextOutput(JSON.stringify({ 
+          success: false, 
+          error: "Missing required parameter 'leadId' for save_estimate" 
+        })).setMimeType(ContentService.MimeType.JSON);
+      }
+
       var colInfoE = getSheetColumnMap(leadsSheet);
       var keyMapE = colInfoE.keyToCol;
       var leadIdColE = keyMapE["leadId"] || 1;
 
       var eRow = findLeadRow(leadsSheet, eLeadId, leadIdColE);
-      if (eRow >= 2) {
-        if (keyMapE["squareFootage"] && data.squareFootage !== undefined) {
-          leadsSheet.getRange(eRow, keyMapE["squareFootage"]).setValue(Number(data.squareFootage)).setNumberFormat("#,##0").setHorizontalAlignment("center");
-        }
-        if (keyMapE["cleaningFrequency"] && data.cleaningFrequency !== undefined) {
-          leadsSheet.getRange(eRow, keyMapE["cleaningFrequency"]).setValue(data.cleaningFrequency).setHorizontalAlignment("center");
-        }
-        if (keyMapE["propertyType"] && data.facilityType !== undefined) {
-          leadsSheet.getRange(eRow, keyMapE["propertyType"]).setValue(data.facilityType).setHorizontalAlignment("center");
-        }
-        if (keyMapE["estimatedValue"] && (data.estimatedValue !== undefined || data.annualContractValue !== undefined)) {
-          leadsSheet.getRange(eRow, keyMapE["estimatedValue"]).setValue(Number(data.estimatedValue || data.annualContractValue)).setNumberFormat("$#,##0").setHorizontalAlignment("center");
-        }
-        if (keyMapE["status"]) {
-          leadsSheet.getRange(eRow, keyMapE["status"]).setValue("Estimating").setHorizontalAlignment("center");
-        }
-        if (keyMapE["lastUpdated"]) {
-          leadsSheet.getRange(eRow, keyMapE["lastUpdated"]).setValue(new Date().toISOString().split("T")[0]).setHorizontalAlignment("center");
-        }
+      if (eRow < 2) {
+        return ContentService.createTextOutput(JSON.stringify({ 
+          success: false, 
+          error: "Lead ID '" + eLeadId + "' not found in Google Sheet. Please select an existing lead or create a new one." 
+        })).setMimeType(ContentService.MimeType.JSON);
+      }
 
-        if (logSheet) {
-          logSheet.appendRow([
-            "ACT-" + Date.now().toString(36).toUpperCase(),
-            eLeadId,
-            new Date().toLocaleString(),
-            "ESTIMATE SAVED",
-            "",
-            "Estimating",
-            "Estimator",
-            "Commercial cleaning calculation saved"
-          ]);
-        }
+      // 1. Update Square Footage
+      if (keyMapE["squareFootage"] && data.squareFootage !== undefined) {
+        leadsSheet.getRange(eRow, keyMapE["squareFootage"]).setValue(Number(data.squareFootage)).setNumberFormat("#,##0").setHorizontalAlignment("center");
+      }
+
+      // 2. Update Cleaning Frequency
+      if (keyMapE["cleaningFrequency"] && data.cleaningFrequency !== undefined) {
+        leadsSheet.getRange(eRow, keyMapE["cleaningFrequency"]).setValue(data.cleaningFrequency).setHorizontalAlignment("center");
+      }
+
+      // 3. Update Property / Facility Type
+      if (keyMapE["propertyType"] && (data.propertyType !== undefined || data.facilityType !== undefined)) {
+        leadsSheet.getRange(eRow, keyMapE["propertyType"]).setValue(data.propertyType || data.facilityType).setHorizontalAlignment("center");
+      }
+
+      // 4. Update Special Requirements if provided
+      if (keyMapE["specialRequirements"] && data.specialRequirements !== undefined) {
+        leadsSheet.getRange(eRow, keyMapE["specialRequirements"]).setValue(data.specialRequirements).setHorizontalAlignment("center");
+      }
+
+      // 5. Update Pricing Values
+      var saveMonthly = Number(data.monthlyEstimate);
+      var saveAnnual = Number(data.estimatedValue || data.annualContractValue);
+      if (!saveMonthly && saveAnnual) {
+        saveMonthly = Math.round(saveAnnual / 12);
+      }
+      if (!saveAnnual && saveMonthly) {
+        saveAnnual = Math.round(saveMonthly * 12);
+      }
+      var saveRate = Number(data.ratePerVisit) || 0;
+
+      if (keyMapE["monthlyEstimate"] && !isNaN(saveMonthly)) {
+        leadsSheet.getRange(eRow, keyMapE["monthlyEstimate"]).setValue(saveMonthly).setNumberFormat("$#,##0").setHorizontalAlignment("center");
+      }
+      if (keyMapE["estimatedValue"] && !isNaN(saveAnnual)) {
+        leadsSheet.getRange(eRow, keyMapE["estimatedValue"]).setValue(saveAnnual).setNumberFormat("$#,##0").setHorizontalAlignment("center");
+      }
+      if (keyMapE["ratePerVisit"] && !isNaN(saveRate) && saveRate > 0) {
+        leadsSheet.getRange(eRow, keyMapE["ratePerVisit"]).setValue(saveRate).setNumberFormat("$#,##0.00").setHorizontalAlignment("center");
+      }
+
+      // 6. Update Status
+      if (keyMapE["status"]) {
+        var currentStatus = leadsSheet.getRange(eRow, keyMapE["status"]).getValue();
+        var nextStatus = data.status || (currentStatus === "New" ? "Estimating" : currentStatus || "Estimating");
+        leadsSheet.getRange(eRow, keyMapE["status"]).setValue(nextStatus).setHorizontalAlignment("center");
+      }
+
+      // 7. Update Last Updated timestamp
+      var todayStr = new Date().toISOString().split("T")[0];
+      if (keyMapE["lastUpdated"]) {
+        leadsSheet.getRange(eRow, keyMapE["lastUpdated"]).setValue(todayStr).setHorizontalAlignment("center");
+      }
+
+      // 8. Re-apply centering & wrapping
+      var totalColsE = leadsSheet.getLastColumn();
+      leadsSheet.getRange(eRow, 1, 1, totalColsE).setHorizontalAlignment("center").setVerticalAlignment("middle").setWrap(true);
+
+      // 9. Activity log
+      if (logSheet) {
+        logSheet.appendRow([
+          "ACT-" + Date.now().toString(36).toUpperCase(),
+          eLeadId,
+          new Date().toLocaleString(),
+          "ESTIMATE SAVED",
+          "",
+          data.status || "Estimating",
+          "Estimator",
+          "Commercial cleaning estimate saved ($" + (saveMonthly || 0) + "/mo, $" + (saveAnnual || 0) + "/yr, $" + (saveRate || 0) + "/visit)"
+        ]);
       }
 
       return ContentService.createTextOutput(JSON.stringify({ 
         success: true, 
-        message: "Estimate saved to lead", 
-        leadId: eLeadId 
+        message: "Estimate saved to lead and spreadsheet", 
+        leadId: eLeadId,
+        updated: {
+          monthlyEstimate: saveMonthly,
+          estimatedValue: saveAnnual,
+          ratePerVisit: saveRate,
+          lastUpdated: todayStr
+        }
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
@@ -775,7 +958,14 @@ function doPost(e) {
     // ACTION: UPDATE PROPOSAL
     // -----------------------------------------------------------------
     if (action === "update_proposal") {
-      var pLeadId = data.leadId;
+      var pLeadId = data.leadId ? String(data.leadId).trim() : "";
+      if (!pLeadId) {
+        return ContentService.createTextOutput(JSON.stringify({ 
+          success: false, 
+          error: "Missing leadId for update_proposal" 
+        })).setMimeType(ContentService.MimeType.JSON);
+      }
+
       var colInfoP = getSheetColumnMap(leadsSheet);
       var keyMapP = colInfoP.keyToCol;
       var leadIdColP = keyMapP["leadId"] || 1;
@@ -877,6 +1067,12 @@ function handleGetLeads() {
     }
     if (!record.leadId) continue; // Skip empty row
 
+    var rawMonthly = Number(record.monthlyEstimate);
+    var rawAnnual = Number(record.estimatedValue || record.annualContractValue);
+    var parsedMonthly = !isNaN(rawMonthly) && rawMonthly > 0 ? rawMonthly : (rawAnnual > 0 ? Math.round(rawAnnual / 12) : 0);
+    var parsedAnnual = !isNaN(rawAnnual) && rawAnnual > 0 ? rawAnnual : (parsedMonthly > 0 ? Math.round(parsedMonthly * 12) : 0);
+    var parsedRate = Number(record.ratePerVisit) || 0;
+
     // Canonical fields with safe defaults
     var canonicalLead = {
       leadId: String(record.leadId),
@@ -896,9 +1092,11 @@ function handleGetLeads() {
       dateCreated: String(record.dateCreated || new Date().toISOString().split("T")[0]),
       lastUpdated: String(record.lastUpdated || new Date().toISOString().split("T")[0]),
 
-      // Estimator & Proposal connections
-      estimatedValue: Number(record.estimatedValue) || 0,
-      annualContractValue: Number(record.estimatedValue) || 0,
+      // Estimator & Pricing connections
+      monthlyEstimate: parsedMonthly,
+      estimatedValue: parsedAnnual,
+      annualContractValue: parsedAnnual,
+      ratePerVisit: parsedRate,
       proposalId: String(record.proposalId || ""),
 
       // Compatibility helpers for UI components
@@ -909,7 +1107,6 @@ function handleGetLeads() {
       projectType: String(record.propertyType || "Commercial Office"),
       facilityType: String(record.propertyType || "corporate_office"),
       projectName: String(record.companyName || "Prospect Facility"),
-      monthlyEstimate: Math.round((Number(record.estimatedValue) || 0) / 12) || 0,
       internalNotes: String(record.notes || ""),
       createdDate: String(record.dateCreated || ""),
       updatedDate: String(record.lastUpdated || "")
@@ -962,8 +1159,9 @@ function findLeadRow(sheet, targetLeadId, leadIdCol) {
     }
   }
 
-  // Fallback: search across first 3 columns in case columns were shifted
-  for (var c = 1; c <= Math.min(3, sheet.getLastColumn()); c++) {
+  // Fallback: search across all columns in case columns were shifted
+  var lastCol = sheet.getLastColumn();
+  for (var c = 1; c <= lastCol; c++) {
     if (c === col) continue;
     var altIds = sheet.getRange(1, c, numRows, 1).getValues();
     for (var r2 = 1; r2 < altIds.length; r2++) {

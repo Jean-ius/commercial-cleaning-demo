@@ -141,6 +141,7 @@ export async function loadLeadsFromGoogleSheets(webhookUrl?: string): Promise<{ 
           // Estimator & Proposal values
           estimatedValue: Number(r.estimatedValue || r.annualContractValue) || 0,
           annualContractValue: Number(r.estimatedValue || r.annualContractValue) || 0,
+          ratePerVisit: Number(r.ratePerVisit) || 0,
           proposalId: String(r.proposalId || ''),
 
           // Compatibility helpers
@@ -151,7 +152,7 @@ export async function loadLeadsFromGoogleSheets(webhookUrl?: string): Promise<{ 
           projectLocation: String(r.propertyAddress || r.projectLocation || ''),
           projectType: String(r.propertyType || r.projectType || 'Commercial Office'),
           facilityType: (r.propertyType || 'corporate_office') as any,
-          monthlyEstimate: Math.round((Number(r.estimatedValue) || 0) / 12) || 0,
+          monthlyEstimate: Number(r.monthlyEstimate) || (r.estimatedValue ? Math.round(Number(r.estimatedValue) / 12) : 0),
           internalNotes: String(r.notes || r.internalNotes || ''),
           createdDate: String(r.dateCreated || ''),
           updatedDate: String(r.lastUpdated || r.updatedDate || '')
@@ -175,7 +176,7 @@ export async function loadLeadsFromGoogleSheets(webhookUrl?: string): Promise<{ 
 export async function createLeadInGoogleSheets(
   lead: LeadRecord,
   webhookUrl?: string
-): Promise<{ success: boolean; leadId: string }> {
+): Promise<{ success: boolean; leadId: string; error?: string }> {
   const targetUrl = resolveWebhookUrl(webhookUrl);
   if (!targetUrl) {
     throw new Error('Google Apps Script Webhook URL is not configured. Please enter your Webhook URL in settings.');
