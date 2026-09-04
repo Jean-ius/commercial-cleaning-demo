@@ -44,6 +44,41 @@ const FILTER_STATUSES: (LeadStatus | 'ALL')[] = [
   'Lost'
 ];
 
+export const getStatusBadge = (status: LeadStatus) => {
+  switch (status) {
+    case 'New':
+      return 'bg-cyan-100 text-cyan-800 border-cyan-300';
+    case 'Contacted':
+      return 'bg-blue-100 text-blue-800 border-blue-300';
+    case 'Estimating':
+      return 'bg-amber-100 text-amber-800 border-amber-300';
+    case 'Quoted':
+      return 'bg-indigo-100 text-indigo-800 border-indigo-300';
+    case 'Negotiation':
+      return 'bg-purple-100 text-purple-800 border-purple-300';
+    case 'Won':
+      return 'bg-emerald-100 text-emerald-900 border-emerald-400 font-extrabold';
+    case 'Lost':
+      return 'bg-rose-100 text-rose-800 border-rose-300';
+    default:
+      return 'bg-slate-100 text-slate-800 border-slate-200';
+  }
+};
+
+export const getScheduleStatusBadge = (status: string) => {
+  switch (status) {
+    case 'Scheduled':
+      return 'bg-sky-100 text-sky-800 border-sky-300';
+    case 'Completed':
+      return 'bg-emerald-100 text-emerald-800 border-emerald-300';
+    case 'Cancelled':
+      return 'bg-rose-100 text-rose-800 border-rose-300';
+    case 'Not Scheduled':
+    default:
+      return 'bg-slate-100 text-slate-700 border-slate-300';
+  }
+};
+
 export const SalesDashboard: React.FC<SalesDashboardProps> = ({
   leads,
   activeLead,
@@ -76,27 +111,6 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
     const matchesStatus = filterStatus === 'ALL' || lead.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
-
-  const getStatusBadge = (status: LeadStatus) => {
-    switch (status) {
-      case 'New':
-        return 'bg-sky-100 text-sky-800 border-sky-200';
-      case 'Contacted':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'Estimating':
-        return 'bg-amber-100 text-amber-800 border-amber-200';
-      case 'Quoted':
-        return 'bg-indigo-100 text-indigo-800 border-indigo-200';
-      case 'Negotiation':
-        return 'bg-purple-100 text-purple-800 border-purple-200';
-      case 'Won':
-        return 'bg-emerald-100 text-emerald-800 border-emerald-200';
-      case 'Lost':
-        return 'bg-rose-100 text-rose-800 border-rose-200';
-      default:
-        return 'bg-slate-100 text-slate-800 border-slate-200';
-    }
-  };
 
   // Pipeline metrics
   const totalPipelineValue = leads.reduce((sum, l) => sum + (l.estimatedValue || l.annualContractValue || 0), 0);

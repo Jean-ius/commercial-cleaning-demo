@@ -294,6 +294,41 @@ function setupSpreadsheet() {
   // Format Square Footage as number with comma separator (Col 9)
   leadsSheet.getRange("I2:I1000").setNumberFormat("#,##0").setHorizontalAlignment("center");
 
+  // -------------------------------------------------------------
+  // CONDITIONAL FORMATTING: Status & Scheduling Color System
+  // -------------------------------------------------------------
+  var statusStyles = [
+    // Sales Pipeline Stages
+    { text: "New", bg: "#E0F7FA", fg: "#0E7490" },          // Cyan 100 / Cyan 700
+    { text: "Contacted", bg: "#DBEAFE", fg: "#1D4ED8" },    // Blue 100 / Blue 700
+    { text: "Estimating", bg: "#FEF3C7", fg: "#B45309" },   // Amber 100 / Amber 700
+    { text: "Quoted", bg: "#E0E7FF", fg: "#4338CA" },       // Indigo 100 / Indigo 700
+    { text: "Negotiation", bg: "#F3E8FF", fg: "#7E22CE" },  // Purple 100 / Purple 700
+    { text: "Won", bg: "#D1FAE5", fg: "#047857" },          // Emerald 100 / Emerald 700
+    { text: "Lost", bg: "#FFE4E6", fg: "#BE123C" },         // Rose 100 / Rose 700
+    
+    // Scheduling & Job Execution Statuses
+    { text: "Not Scheduled", bg: "#F1F5F9", fg: "#475569" },// Slate 100 / Slate 600
+    { text: "Scheduled", bg: "#E0F2FE", fg: "#0369A1" },    // Sky 100 / Sky 700
+    { text: "Completed", bg: "#DCFCE7", fg: "#15803D" },    // Green 100 / Green 700
+    { text: "Cancelled", bg: "#FEE2E2", fg: "#B91C1C" }     // Red 100 / Red 700
+  ];
+
+  var statusRange = leadsSheet.getRange("M2:M1000");
+  var conditionalRules = [];
+  for (var c = 0; c < statusStyles.length; c++) {
+    var st = statusStyles[c];
+    var rule = SpreadsheetApp.newConditionalFormatRule()
+      .whenTextEqualTo(st.text)
+      .setBackground(st.bg)
+      .setFontColor(st.fg)
+      .setBold(true)
+      .setRanges([statusRange])
+      .build();
+    conditionalRules.push(rule);
+  }
+  leadsSheet.setConditionalFormatRules(conditionalRules);
+
   // 2. Setup SETTINGS Sheet
   var settingsSheet = ss.getSheetByName(SHEET_NAMES.SETTINGS) || ss.insertSheet(SHEET_NAMES.SETTINGS, 1);
   if (settingsSheet.getLastRow() < 1) {
@@ -331,6 +366,22 @@ function setupSpreadsheet() {
   for (var k = 1; k <= ACTIVITY_LOG_HEADERS.length; k++) {
     logSheet.setColumnWidth(k, 180);
   }
+
+  // Activity Log status conditional rules (Cols E & F: Previous Status & New Status)
+  var logStatusRange = logSheet.getRange("E2:F500");
+  var logRules = [];
+  for (var m = 0; m < colorStyles.length; m++) {
+    var lst = colorStyles[m];
+    var lrule = SpreadsheetApp.newConditionalFormatRule()
+      .whenTextEqualTo(lst.text)
+      .setBackground(lst.bg)
+      .setFontColor(lst.fg)
+      .setBold(true)
+      .setRanges([logStatusRange])
+      .build();
+    logRules.push(lrule);
+  }
+  logSheet.setConditionalFormatRules(logRules);
 }
 
 /**

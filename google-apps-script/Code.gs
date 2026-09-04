@@ -274,14 +274,81 @@ function setupSpreadsheet() {
     leadsSheet.setRowHeight(r, 38);
   }
 
-  // Status dropdown validation (Col 13) - Centered
+  var colMap = getSheetColumnMap(leadsSheet).keyToCol;
+  var repCol = colMap.assignedSalesRep || 12;
+  var statCol = colMap.status || 13;
+  var sqftCol = colMap.squareFootage || 9;
+
+  // Status dropdown validation (Col 13 / M) - Centered
   var statRule = SpreadsheetApp.newDataValidation()
     .requireValueInList(["New", "Contacted", "Estimating", "Quoted", "Negotiation", "Won", "Lost"], true)
     .build();
-  leadsSheet.getRange("M2:M1000").setDataValidation(statRule).setHorizontalAlignment("center");
+  leadsSheet.getRange(2, statCol, 999, 1).setDataValidation(statRule).setHorizontalAlignment("center");
+
+  // Assigned Sales Rep dropdown validation (Col 12 / L) - Centered (allows suggestions + custom values)
+  var repRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(["Unassigned", "Completed", "Scheduled", "Not Scheduled", "Cancelled", "Marcus Vance", "CleanCommand Sales"], true)
+    .setAllowInvalid(true)
+    .build();
+  leadsSheet.getRange(2, repCol, 999, 1).setDataValidation(repRule).setHorizontalAlignment("center");
 
   // Format Square Footage as number with comma separator (Col 9)
-  leadsSheet.getRange("I2:I1000").setNumberFormat("#,##0").setHorizontalAlignment("center");
+  leadsSheet.getRange(2, sqftCol, 999, 1).setNumberFormat("#,##0").setHorizontalAlignment("center");
+
+  // -------------------------------------------------------------
+  // CONDITIONAL FORMATTING: Status & Assigned Sales Rep Color System
+  // -------------------------------------------------------------
+  var colorStyles = [
+    // 1. Sales Pipeline Stages
+    { text: "New", bg: "#E0F7FA", fg: "#0E7490" },
+    { text: "NEW", bg: "#E0F7FA", fg: "#0E7490" },
+    { text: "Contacted", bg: "#DBEAFE", fg: "#1D4ED8" },
+    { text: "CONTACTED", bg: "#DBEAFE", fg: "#1D4ED8" },
+    { text: "Estimating", bg: "#FEF3C7", fg: "#B45309" },
+    { text: "ESTIMATING", bg: "#FEF3C7", fg: "#B45309" },
+    { text: "Quoted", bg: "#E0E7FF", fg: "#4338CA" },
+    { text: "QUOTED", bg: "#E0E7FF", fg: "#4338CA" },
+    { text: "Negotiation", bg: "#F3E8FF", fg: "#7E22CE" },
+    { text: "NEGOTIATION", bg: "#F3E8FF", fg: "#7E22CE" },
+    { text: "Won", bg: "#D1FAE5", fg: "#047857" },
+    { text: "WON", bg: "#D1FAE5", fg: "#047857" },
+    { text: "Lost", bg: "#FFE4E6", fg: "#BE123C" },
+    { text: "LOST", bg: "#FFE4E6", fg: "#BE123C" },
+    
+    // 2. Scheduling & Execution Statuses (Applies to both Rep and Status columns)
+    { text: "Completed", bg: "#DCFCE7", fg: "#15803D" },
+    { text: "COMPLETED", bg: "#DCFCE7", fg: "#15803D" },
+    { text: "Scheduled", bg: "#E0F2FE", fg: "#0369A1" },
+    { text: "SCHEDULED", bg: "#E0F2FE", fg: "#0369A1" },
+    { text: "Not Scheduled", bg: "#F1F5F9", fg: "#475569" },
+    { text: "NOT SCHEDULED", bg: "#F1F5F9", fg: "#475569" },
+    { text: "Cancelled", bg: "#FEE2E2", fg: "#B91C1C" },
+    { text: "CANCELLED", bg: "#FEE2E2", fg: "#B91C1C" },
+
+    // 3. Sales Rep & Assignment States
+    { text: "Unassigned", bg: "#F1F5F9", fg: "#64748B" },
+    { text: "UNASSIGNED", bg: "#F1F5F9", fg: "#64748B" },
+    { text: "Marcus Vance", bg: "#E0E7FF", fg: "#4338CA" },
+    { text: "CleanCommand Sales", bg: "#DBEAFE", fg: "#1D4ED8" },
+    { text: "In-House Team", bg: "#FEF3C7", fg: "#B45309" }
+  ];
+
+  var statusRange = leadsSheet.getRange(2, statCol, 999, 1);
+  var repRange = leadsSheet.getRange(2, repCol, 999, 1);
+
+  var conditionalRules = [];
+  for (var c = 0; c < colorStyles.length; c++) {
+    var cs = colorStyles[c];
+    var rule = SpreadsheetApp.newConditionalFormatRule()
+      .whenTextEqualTo(cs.text)
+      .setBackground(cs.bg)
+      .setFontColor(cs.fg)
+      .setBold(true)
+      .setRanges([statusRange, repRange])
+      .build();
+    conditionalRules.push(rule);
+  }
+  leadsSheet.setConditionalFormatRules(conditionalRules);
 
   // 2. Setup SETTINGS Sheet
   var settingsSheet = ss.getSheetByName(SHEET_NAMES.SETTINGS) || ss.insertSheet(SHEET_NAMES.SETTINGS, 1);
@@ -320,6 +387,22 @@ function setupSpreadsheet() {
   for (var k = 1; k <= ACTIVITY_LOG_HEADERS.length; k++) {
     logSheet.setColumnWidth(k, 180);
   }
+
+  // Activity Log status conditional rules (Cols E & F: Previous Status & New Status)
+  var logStatusRange = logSheet.getRange("E2:F500");
+  var logRules = [];
+  for (var m = 0; m < colorStyles.length; m++) {
+    var lst = colorStyles[m];
+    var lrule = SpreadsheetApp.newConditionalFormatRule()
+      .whenTextEqualTo(lst.text)
+      .setBackground(lst.bg)
+      .setFontColor(lst.fg)
+      .setBold(true)
+      .setRanges([logStatusRange])
+      .build();
+    logRules.push(lrule);
+  }
+  logSheet.setConditionalFormatRules(logRules);
 }
 
 /**
@@ -369,7 +452,9 @@ function doPost(e) {
     }
 
     var action = body.action;
-    var data = body.data || {};
+    var data = (body.data && typeof body.data === "object") ? body.data : body;
+    if (body.leadId && !data.leadId) data.leadId = body.leadId;
+    if (body.status && !data.status) data.status = body.status;
 
     var ss = getSpreadsheet();
     if (!ss) {

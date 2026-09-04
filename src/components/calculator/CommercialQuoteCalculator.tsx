@@ -13,7 +13,8 @@ import {
   Sparkles, 
   Save, 
   Building2, 
-  AlertTriangle 
+  AlertTriangle,
+  X
 } from 'lucide-react';
 import { 
   FacilitySectorId, 
@@ -31,12 +32,24 @@ import {
   defaultPricingParameters 
 } from '../../config/clientConfig';
 import { calculateCommercialEstimate, formatCurrency } from '../../utils/pricingEngine';
+import { SaveEstimateModal } from './SaveEstimateModal';
 
 interface CommercialQuoteCalculatorProps {
   brandConfig: ClientBrandConfig;
   onOpenProposalGenerator: (estimate: EstimateResult) => void;
   pricingParams?: PricingParameters;
   activeLead?: LeadRecord | null;
+  leads?: LeadRecord[];
+  onSaveEstimateToLead?: (
+    leadId: string,
+    estimate: EstimateResult, 
+    facilitySpecs: { 
+      squareFootage: number; 
+      facilityType: FacilitySectorId; 
+      cleaningFrequency: FrequencyId; 
+      selectedAddOns: AddOnServiceId[]; 
+    }
+  ) => Promise<void>;
   onSaveEstimate?: (
     estimate: EstimateResult, 
     facilitySpecs: { 
@@ -55,6 +68,8 @@ interface CommercialQuoteCalculatorProps {
       selectedAddOns: AddOnServiceId[];
     }
   ) => void;
+  onSaveStandalone?: (estimate: EstimateResult) => void;
+  onClearActiveLead?: () => void;
 }
 
 export const CommercialQuoteCalculator: React.FC<CommercialQuoteCalculatorProps> = ({
@@ -62,8 +77,12 @@ export const CommercialQuoteCalculator: React.FC<CommercialQuoteCalculatorProps>
   onOpenProposalGenerator,
   pricingParams = defaultPricingParameters,
   activeLead,
+  leads = [],
+  onSaveEstimateToLead,
   onSaveEstimate,
-  onSaveAsNewLead
+  onSaveAsNewLead,
+  onSaveStandalone,
+  onClearActiveLead
 }) => {
   const [squareFootage, setSquareFootage] = useState<number>(activeLead?.squareFootage || 12500);
   const [selectedSectorId, setSelectedSectorId] = useState<FacilitySectorId>(activeLead?.facilityType || 'corporate_office');
@@ -73,6 +92,7 @@ export const CommercialQuoteCalculator: React.FC<CommercialQuoteCalculatorProps>
   const [isSavingEstimate, setIsSavingEstimate] = useState<boolean>(false);
   const [justSaved, setJustSaved] = useState<boolean>(false);
   const [validationWarning, setValidationWarning] = useState<string>('');
+  const [isSaveDestinationModalOpen, setIsSaveDestinationModalOpen] = useState<boolean>(false);
 
   // Sync state if activeLead changes
   useEffect(() => {
@@ -105,26 +125,6 @@ export const CommercialQuoteCalculator: React.FC<CommercialQuoteCalculatorProps>
 
   const handleQuickSqFt = (amount: number) => {
     setSquareFootage(amount);
-  };
-
-  const handleSaveEstimateClick = async () => {
-    if (!onSaveEstimate) return;
-    setIsSavingEstimate(true);
-    setValidationWarning('');
-    try {
-      await onSaveEstimate(estimate, {
-        squareFootage,
-        facilityType: selectedSectorId,
-        cleaningFrequency: selectedFrequencyId,
-        selectedAddOns
-      });
-      setJustSaved(true);
-      setTimeout(() => setJustSaved(false), 3000);
-    } catch (e: any) {
-      setValidationWarning('Failed to save estimate to Google Sheets.');
-    } finally {
-      setIsSavingEstimate(false);
-    }
   };
 
   const handleProposalClick = () => {
@@ -168,11 +168,24 @@ export const CommercialQuoteCalculator: React.FC<CommercialQuoteCalculatorProps>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500">Current Saved Rate:</span>
-            <span className="font-mono font-bold text-emerald-700 text-sm">
-              {formatCurrency(activeLead.monthlyEstimate || Math.round((activeLead.estimatedValue || 0) / 12))}/mo
-            </span>
+          <div className="flex items-center gap-3">
+            <div className="text-right hidden sm:block">
+              <span className="text-xs text-slate-400 block">Current Saved Rate:</span>
+              <span className="font-mono font-bold text-emerald-400 text-sm">
+                {formatCurrency(activeLead.monthlyEstimate || Math.round((activeLead.estimatedValue || 0) / 12))}/mo
+              </span>
+            </div>
+            {onClearActiveLead && (
+              <button
+                type="button"
+                onClick={onClearActiveLead}
+                className="text-xs font-semibold px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 shadow-sm"
+                title="Disconnect current lead and start a new blank estimate for another company"
+              >
+                <X className="w-3.5 h-3.5 text-slate-400" />
+                <span>New Blank Estimate</span>
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -455,59 +468,45 @@ export const CommercialQuoteCalculator: React.FC<CommercialQuoteCalculatorProps>
 
             {/* CTAs Hierarchy */}
             <div className="pt-5 space-y-3">
-              {/* PRIMARY ACTION: Save Estimate if connected to activeLead */}
-              {activeLead && onSaveEstimate ? (
-                <button
-                  type="button"
-                  onClick={handleSaveEstimateClick}
-                  disabled={isSavingEstimate}
-                  className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-blue-600/30 transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer disabled:opacity-50"
-                >
-                  {isSavingEstimate ? (
-                    <>
-                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span>Saving Estimate to CRM...</span>
-                    </>
-                  ) : justSaved ? (
-                    <>
-                      <CheckCircle className="w-4 h-4 text-emerald-300" />
-                      <span>Estimate Saved to LeadRecord!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4" />
-                      <span>Save Estimate to Lead ({activeLead.leadId})</span>
-                    </>
-                  )}
-                </button>
-              ) : null}
+              {/* PRIMARY ACTION: Save Estimate (Always opens destination choice dialog) */}
+              <button
+                type="button"
+                onClick={() => setIsSaveDestinationModalOpen(true)}
+                disabled={isSavingEstimate}
+                className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-blue-600/30 transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer disabled:opacity-50"
+              >
+                {isSavingEstimate ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Saving Estimate to Google Sheets...</span>
+                  </>
+                ) : justSaved ? (
+                  <>
+                    <CheckCircle className="w-4 h-4 text-emerald-300" />
+                    <span>Estimate Saved!</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    <span>Save Estimate</span>
+                    {activeLead && (
+                      <span className="text-[10px] bg-blue-700/80 px-2 py-0.5 rounded-full text-blue-200 border border-blue-500/50">
+                        {activeLead.companyName || activeLead.leadId}
+                      </span>
+                    )}
+                  </>
+                )}
+              </button>
 
-              {/* PRIMARY ACTION: Generate Professional Proposal */}
+              {/* SECONDARY ACTION: Generate Professional Proposal */}
               <button
                 type="button"
                 onClick={handleProposalClick}
-                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold shadow-sm transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white text-xs sm:text-sm font-bold shadow-sm transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
               >
-                <FileText className="w-4 h-4" />
+                <FileText className="w-4 h-4 text-blue-400" />
                 <span>Generate Professional Proposal Document</span>
               </button>
-
-              {/* OPTIONAL CONVERT WORKFLOW (When in standalone mode) */}
-              {!activeLead && onSaveAsNewLead && (
-                <button
-                  type="button"
-                  onClick={() => onSaveAsNewLead(estimate, {
-                    squareFootage,
-                    facilityType: selectedSectorId,
-                    cleaningFrequency: selectedFrequencyId,
-                    selectedAddOns
-                  })}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold transition-all cursor-pointer shadow-sm hover:border-blue-300"
-                >
-                  <Sparkles className="w-4 h-4 text-blue-600" />
-                  <span>+ Convert Estimate to New Lead</span>
-                </button>
-              )}
             </div>
 
             <div className="mt-4 pt-3 border-t border-slate-800 text-center">
@@ -536,6 +535,61 @@ export const CommercialQuoteCalculator: React.FC<CommercialQuoteCalculatorProps>
         </div>
 
       </div>
+
+      {/* Save Destination Choice Modal (Existing Lead, New Lead, or Standalone) */}
+      <SaveEstimateModal
+        isOpen={isSaveDestinationModalOpen}
+        onClose={() => setIsSaveDestinationModalOpen(false)}
+        estimate={estimate}
+        specs={{
+          squareFootage,
+          facilityType: activeSector.name,
+          cleaningFrequency: frequencyOptions.find(f => f.id === selectedFrequencyId)?.label || selectedFrequencyId
+        }}
+        leads={leads}
+        activeLead={activeLead}
+        onConfirmSaveToExisting={async (targetLeadId) => {
+          setIsSavingEstimate(true);
+          try {
+            if (onSaveEstimateToLead) {
+              await onSaveEstimateToLead(targetLeadId, estimate, {
+                squareFootage,
+                facilityType: selectedSectorId,
+                cleaningFrequency: selectedFrequencyId,
+                selectedAddOns
+              });
+            } else if (onSaveEstimate) {
+              await onSaveEstimate(estimate, {
+                squareFootage,
+                facilityType: selectedSectorId,
+                cleaningFrequency: selectedFrequencyId,
+                selectedAddOns
+              });
+            }
+            setJustSaved(true);
+            setTimeout(() => setJustSaved(false), 3000);
+          } finally {
+            setIsSavingEstimate(false);
+          }
+        }}
+        onConfirmSaveToNew={() => {
+          if (onSaveAsNewLead) {
+            onSaveAsNewLead(estimate, {
+              squareFootage,
+              facilityType: selectedSectorId,
+              cleaningFrequency: selectedFrequencyId,
+              selectedAddOns
+            });
+          }
+        }}
+        onConfirmSaveStandalone={() => {
+          if (onSaveStandalone) {
+            onSaveStandalone(estimate);
+          }
+          setJustSaved(true);
+          setTimeout(() => setJustSaved(false), 3000);
+        }}
+      />
     </section>
   );
 };

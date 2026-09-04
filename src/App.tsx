@@ -172,7 +172,9 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleSaveEstimate = async (
+  // Save estimate specifically to an existing lead by Lead ID
+  const handleSaveEstimateToLead = async (
+    targetLeadId: string,
     estimate: EstimateResult,
     facilitySpecs: {
       squareFootage: number;
@@ -181,10 +183,13 @@ export const App: React.FC = () => {
       selectedAddOns: AddOnServiceId[];
     }
   ) => {
-    if (!activeLead) return;
+    const targetLead = leads.find(l => l.leadId === targetLeadId) || activeLead;
+    if (!targetLead) {
+      throw new Error(`Lead ${targetLeadId} could not be located in records.`);
+    }
 
     const updatedLead: LeadRecord = {
-      ...activeLead,
+      ...targetLead,
       squareFootage: facilitySpecs.squareFootage,
       facilityType: facilitySpecs.facilityType,
       cleaningFrequency: facilitySpecs.cleaningFrequency,
@@ -195,16 +200,14 @@ export const App: React.FC = () => {
       estimatedLaborHours: estimate.hoursPerCleaningVisit,
       recommendedCrewSize: estimate.recommendedCrewSize,
       estimateSnapshot: estimate,
-      status: activeLead.status === 'New' ? 'Estimating' : activeLead.status,
+      status: targetLead.status === 'New' ? 'Estimating' : targetLead.status,
       updatedDate: new Date().toISOString().split('T')[0],
       lastUpdated: new Date().toISOString().split('T')[0],
-
-      // Compatibility helpers
       monthlyEstimate: estimate.totalEstimatedMonthlyInvestment
     };
 
     try {
-      await saveEstimateToGoogleSheets(updatedLead.leadId, {
+      await saveEstimateToGoogleSheets(targetLead.leadId, {
         estimatedValue: estimate.annualContractValue,
         monthlyEstimate: estimate.totalEstimatedMonthlyInvestment,
         ratePerVisit: estimate.pricePerVisit,
@@ -221,10 +224,24 @@ export const App: React.FC = () => {
       setActiveLead(updatedLead);
       setActiveEstimate(estimate);
       setLeads(prev => prev.map(l => l.leadId === updatedLead.leadId ? updatedLead : l));
-      triggerToast(`Saved estimate ($${estimate.totalEstimatedMonthlyInvestment}/mo) to ${updatedLead.companyName}!`);
+      triggerToast(`Saved estimate ($${estimate.totalEstimatedMonthlyInvestment}/mo) to ${updatedLead.companyName} (${updatedLead.leadId})!`);
     } catch (e: any) {
       triggerToast(`Failed to save estimate to Google Sheets: ${e?.message || 'Error'}`);
+      throw e;
     }
+  };
+
+  const handleSaveEstimate = async (
+    estimate: EstimateResult,
+    facilitySpecs: {
+      squareFootage: number;
+      facilityType: FacilitySectorId;
+      cleaningFrequency: FrequencyId;
+      selectedAddOns: AddOnServiceId[];
+    }
+  ) => {
+    if (!activeLead) return;
+    await handleSaveEstimateToLead(activeLead.leadId, estimate, facilitySpecs);
   };
 
   // Convert standalone estimate to a new lead
@@ -237,6 +254,7 @@ export const App: React.FC = () => {
       selectedAddOns: AddOnServiceId[];
     }
   ) => {
+    setActiveEstimate(estimate);
     setInitialSpecsForNewLead({
       squareFootage: facilitySpecs.squareFootage,
       facilityType: facilitySpecs.facilityType,
@@ -244,6 +262,19 @@ export const App: React.FC = () => {
       estimatedValue: estimate.annualContractValue
     });
     setIsNewLeadModalOpen(true);
+  };
+
+  // Save calculation standalone without any lead
+  const handleSaveStandalone = (estimate: EstimateResult) => {
+    setActiveEstimate(estimate);
+    setActiveLead(null);
+    triggerToast(`Estimate saved standalone ($${estimate.totalEstimatedMonthlyInvestment}/mo). Ready for proposal.`);
+  };
+
+  // Reset/Clear active lead so user can start an independent estimate for another company
+  const handleClearActiveLead = () => {
+    setActiveLead(null);
+    triggerToast('Cleared active lead. Ready for a new blank estimate.');
   };
 
   const handleUpdateStatus = async (leadId: string, newStatus: LeadStatus) => {
@@ -439,8 +470,12 @@ export const App: React.FC = () => {
               <CommercialQuoteCalculator
                 brandConfig={brandConfig}
                 activeLead={activeLead}
+                leads={leads}
+                onSaveEstimateToLead={handleSaveEstimateToLead}
                 onSaveEstimate={handleSaveEstimate}
                 onSaveAsNewLead={handleSaveAsNewLead}
+                onSaveStandalone={handleSaveStandalone}
+                onClearActiveLead={handleClearActiveLead}
                 onOpenProposalGenerator={handleOpenProposalGenerator}
               />
             </div>
