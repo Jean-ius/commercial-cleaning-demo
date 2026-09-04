@@ -58,19 +58,19 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
   const getStatusBadge = (status: LeadStatus) => {
     switch (status) {
       case 'NEW':
-        return 'bg-blue-950/60 text-blue-300 border-blue-800';
+        return 'bg-blue-50 text-blue-700 border-blue-200';
       case 'QUALIFIED':
-        return 'bg-indigo-950/60 text-indigo-300 border-indigo-800';
+        return 'bg-indigo-50 text-indigo-700 border-indigo-200';
       case 'WALKTHROUGH':
-        return 'bg-amber-950/60 text-amber-300 border-amber-800';
+        return 'bg-amber-50 text-amber-700 border-amber-200';
       case 'PROPOSAL':
-        return 'bg-purple-950/60 text-purple-300 border-purple-800';
+        return 'bg-purple-50 text-purple-700 border-purple-200';
       case 'WON':
-        return 'bg-emerald-950/60 text-emerald-300 border-emerald-800';
+        return 'bg-emerald-50 text-emerald-700 border-emerald-200 font-bold';
       case 'LOST':
-        return 'bg-rose-950/60 text-rose-300 border-rose-800';
+        return 'bg-rose-50 text-rose-700 border-rose-200';
       default:
-        return 'bg-slate-800 text-slate-300 border-slate-700';
+        return 'bg-slate-100 text-slate-700 border-slate-200';
     }
   };
 
@@ -83,16 +83,16 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
     <div className="py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-6">
       
       {/* Top Header & Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-950 border border-blue-800 text-blue-300 text-xs font-semibold uppercase tracking-wider mb-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold uppercase tracking-wider mb-2">
             <Building2 className="w-3.5 h-3.5" />
             <span>Internal Commercial Sales Hub</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
             Sales Opportunities &amp; Estimating CRM
           </h1>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
             Canonical LeadRecord management, instant square-footage bidding, and Google Sheets synchronization across {brandConfig.primaryCity}.
           </p>
         </div>
@@ -101,7 +101,7 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
           <button
             type="button"
             onClick={onOpenNewLeadModal}
-            className="flex items-center gap-2 px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm shadow-lg shadow-blue-600/30 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+            className="flex items-center gap-2 px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-md shadow-blue-600/20 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>+ New Lead</span>
@@ -122,13 +122,13 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
 
       {/* Active Lead Highlight Banner (if selected) */}
       {activeLead && (
-        <div className="bg-gradient-to-r from-blue-950/80 via-slate-900 to-indigo-950/80 border border-blue-800/80 rounded-2xl p-5 shadow-lg flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="bg-gradient-to-r from-blue-50/90 via-white to-indigo-50/90 border border-blue-200 rounded-2xl p-5 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2.5">
-              <span className="font-mono text-xs font-bold text-blue-400 bg-blue-950 px-2 py-0.5 rounded border border-blue-800">
+              <span className="font-mono text-xs font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded border border-blue-200">
                 {activeLead.leadId}
               </span>
-              <h3 className="text-base sm:text-lg font-bold text-white">
+              <h3 className="text-base sm:text-lg font-bold text-slate-900">
                 {activeLead.companyName}
               </h3>
               <span className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold border ${getStatusBadge(activeLead.status)}`}>
@@ -136,12 +136,12 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
               </span>
             </div>
 
-            <p className="text-xs text-slate-300 flex flex-wrap items-center gap-3 pt-1">
-              <span>Contact: <strong className="text-white">{activeLead.fullName || 'Not specified'}</strong></span>
+            <p className="text-xs text-slate-600 flex flex-wrap items-center gap-3 pt-1">
+              <span>Contact: <strong className="text-slate-900">{activeLead.fullName || 'Not specified'}</strong></span>
               <span>•</span>
-              <span>Facility: <strong className="text-white">{getSectorName(activeLead.facilityType)}</strong> ({activeLead.squareFootage.toLocaleString()} sq ft)</span>
+              <span>Facility: <strong className="text-slate-900">{getSectorName(activeLead.facilityType)}</strong> ({activeLead.squareFootage.toLocaleString()} sq ft)</span>
               <span>•</span>
-              <span>Monthly Rate: <strong className="text-emerald-400 font-mono text-sm">{formatCurrency(activeLead.monthlyEstimate)}/mo</strong></span>
+              <span>Monthly Rate: <strong className="text-emerald-700 font-mono text-sm">{formatCurrency(activeLead.monthlyEstimate)}/mo</strong></span>
             </p>
           </div>
 
@@ -149,7 +149,7 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
             <button
               type="button"
               onClick={() => onOpenEstimatorForLead(activeLead)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
             >
               <Sliders className="w-3.5 h-3.5" />
               <span>Adjust Estimate</span>
@@ -158,18 +158,18 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
             <button
               type="button"
               onClick={() => onOpenWalkthroughModal(activeLead)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold transition-all cursor-pointer shadow-sm"
             >
-              <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+              <Calendar className="w-3.5 h-3.5 text-emerald-600" />
               <span>Walkthrough ({activeLead.walkthroughStatus})</span>
             </button>
 
             <button
               type="button"
               onClick={() => onOpenProposalForLead(activeLead)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold transition-all cursor-pointer shadow-sm"
             >
-              <FileText className="w-3.5 h-3.5 text-purple-400" />
+              <FileText className="w-3.5 h-3.5 text-purple-600" />
               <span>Generate Proposal</span>
             </button>
           </div>
@@ -177,7 +177,7 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
       )}
 
       {/* Filter & Search Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-slate-900 border border-slate-800 rounded-2xl p-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3.5 top-2.5 w-4 h-4 text-slate-400" />
           <input
@@ -185,12 +185,12 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
             placeholder="Search leads by company, contact, ID, address..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 text-xs sm:text-sm bg-slate-800/90 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+            className="w-full pl-10 pr-4 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white"
           />
         </div>
 
         <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
-          <span className="text-xs text-slate-400 font-medium whitespace-nowrap">Filter Status:</span>
+          <span className="text-xs text-slate-500 font-medium whitespace-nowrap">Filter Status:</span>
           {['ALL', 'NEW', 'QUALIFIED', 'WALKTHROUGH', 'PROPOSAL', 'WON', 'LOST'].map((st) => (
             <button
               key={st}
@@ -198,8 +198,8 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
               onClick={() => setFilterStatus(st)}
               className={`px-3 py-1 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
                 filterStatus === st
-                  ? 'bg-blue-600 text-white font-bold'
-                  : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
+                  ? 'bg-blue-600 text-white font-bold shadow-sm'
+                  : 'bg-slate-100 text-slate-600 hover:text-slate-900 hover:bg-slate-200'
               }`}
             >
               {st}
@@ -209,10 +209,10 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
       </div>
 
       {/* Leads Table (Executive 15-Column Mirror) */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-300">
-            <thead className="bg-slate-950/90 border-b border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+          <table className="w-full text-left text-xs text-slate-700">
+            <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
               <tr>
                 <th className="py-3.5 px-4">Lead ID</th>
                 <th className="py-3.5 px-4">Company &amp; Contact</th>
@@ -224,7 +224,7 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
                 <th className="py-3.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-slate-100">
               {filteredLeads.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-slate-500">
@@ -241,50 +241,50 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
                       onClick={() => onSelectLead(lead)}
                       className={`transition-colors cursor-pointer ${
                         isSelected 
-                          ? 'bg-blue-950/40 hover:bg-blue-950/60' 
-                          : 'hover:bg-slate-800/50'
+                          ? 'bg-blue-50/70 hover:bg-blue-50' 
+                          : 'hover:bg-slate-50/80'
                       }`}
                     >
                       {/* Lead ID */}
-                      <td className="py-3.5 px-4 font-mono font-bold text-blue-400 whitespace-nowrap">
+                      <td className="py-3.5 px-4 font-mono font-bold text-blue-700 whitespace-nowrap">
                         {lead.leadId}
-                        <span className="block font-sans text-[10px] font-normal text-slate-500">
+                        <span className="block font-sans text-[10px] font-normal text-slate-400">
                           {lead.createdDate}
                         </span>
                       </td>
 
                       {/* Company & Contact */}
                       <td className="py-3.5 px-4">
-                        <strong className="text-white font-semibold text-sm block">
+                        <strong className="text-slate-900 font-bold text-sm block">
                           {lead.companyName}
                         </strong>
-                        <span className="text-slate-400 flex items-center gap-1.5 mt-0.5">
-                          <User className="w-3 h-3 text-slate-500" />
+                        <span className="text-slate-500 flex items-center gap-1.5 mt-0.5">
+                          <User className="w-3 h-3 text-slate-400" />
                           <span>{lead.fullName || 'No contact specified'}</span>
                           {lead.phoneNumber && (
-                            <span className="text-slate-500">• {lead.phoneNumber}</span>
+                            <span className="text-slate-400">• {lead.phoneNumber}</span>
                           )}
                         </span>
                       </td>
 
                       {/* Facility & Specs */}
                       <td className="py-3.5 px-4">
-                        <span className="text-slate-200 font-medium block">
+                        <span className="text-slate-800 font-medium block">
                           {getSectorName(lead.facilityType)}
                         </span>
-                        <span className="text-slate-400 text-[11px] font-mono">
+                        <span className="text-slate-500 text-[11px] font-mono">
                           {lead.squareFootage.toLocaleString()} sq ft • {lead.cleaningFrequency.replace('_', ' ')}
                         </span>
                       </td>
 
                       {/* Monthly Estimate */}
-                      <td className="py-3.5 px-4 text-right font-mono font-bold text-emerald-400 text-sm tabular-nums whitespace-nowrap">
+                      <td className="py-3.5 px-4 text-right font-mono font-bold text-emerald-700 text-sm tabular-nums whitespace-nowrap">
                         {lead.monthlyEstimate > 0 ? (
                           formatCurrency(lead.monthlyEstimate)
                         ) : (
-                          <span className="text-slate-500 font-sans text-xs">Uncalculated</span>
+                          <span className="text-slate-400 font-sans text-xs">Uncalculated</span>
                         )}
-                        <span className="block font-sans text-[10px] font-normal text-slate-500">
+                        <span className="block font-sans text-[10px] font-normal text-slate-400">
                           ACV: {formatCurrency(lead.annualContractValue || lead.monthlyEstimate * 12)}
                         </span>
                       </td>
@@ -293,10 +293,10 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
                       <td className="py-3.5 px-4 text-center whitespace-nowrap">
                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${
                           lead.walkthroughStatus === 'COMPLETED'
-                            ? 'bg-emerald-950/60 text-emerald-300 border-emerald-800'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                             : lead.walkthroughStatus === 'SCHEDULED'
-                            ? 'bg-amber-950/60 text-amber-300 border-amber-800'
-                            : 'bg-slate-800 text-slate-400 border-slate-700'
+                            ? 'bg-amber-50 text-amber-700 border-amber-200'
+                            : 'bg-slate-100 text-slate-500 border-slate-200'
                         }`}>
                           {lead.walkthroughStatus}
                         </span>
@@ -306,10 +306,10 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
                       <td className="py-3.5 px-4 text-center whitespace-nowrap">
                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${
                           lead.proposalStatus === 'ACCEPTED'
-                            ? 'bg-emerald-950/60 text-emerald-300 border-emerald-800'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                             : lead.proposalStatus === 'GENERATED' || lead.proposalStatus === 'SENT'
-                            ? 'bg-purple-950/60 text-purple-300 border-purple-800'
-                            : 'bg-slate-800 text-slate-400 border-slate-700'
+                            ? 'bg-purple-50 text-purple-700 border-purple-200'
+                            : 'bg-slate-100 text-slate-500 border-slate-200'
                         }`}>
                           {lead.proposalStatus}
                         </span>
@@ -329,7 +329,7 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
                             type="button"
                             title="Open in Estimator"
                             onClick={() => onOpenEstimatorForLead(lead)}
-                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-blue-600 text-slate-300 hover:text-white transition-colors cursor-pointer"
+                            className="p-1.5 rounded-lg bg-slate-100 hover:bg-blue-50 border border-slate-200 text-slate-600 hover:text-blue-700 transition-colors cursor-pointer"
                           >
                             <Sliders className="w-3.5 h-3.5" />
                           </button>
@@ -337,7 +337,7 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
                             type="button"
                             title="Schedule Walkthrough"
                             onClick={() => onOpenWalkthroughModal(lead)}
-                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-emerald-600 text-slate-300 hover:text-white transition-colors cursor-pointer"
+                            className="p-1.5 rounded-lg bg-slate-100 hover:bg-emerald-50 border border-slate-200 text-slate-600 hover:text-emerald-700 transition-colors cursor-pointer"
                           >
                             <Calendar className="w-3.5 h-3.5" />
                           </button>
@@ -345,7 +345,7 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
                             type="button"
                             title="Generate Proposal"
                             onClick={() => onOpenProposalForLead(lead)}
-                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-purple-600 text-slate-300 hover:text-white transition-colors cursor-pointer"
+                            className="p-1.5 rounded-lg bg-slate-100 hover:bg-purple-50 border border-slate-200 text-slate-600 hover:text-purple-700 transition-colors cursor-pointer"
                           >
                             <FileText className="w-3.5 h-3.5" />
                           </button>
