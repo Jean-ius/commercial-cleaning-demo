@@ -14,7 +14,8 @@ import {
   Save, 
   Building2, 
   AlertTriangle,
-  X
+  X,
+  Monitor
 } from 'lucide-react';
 import { 
   FacilitySectorId, 
@@ -156,45 +157,35 @@ export const CommercialQuoteCalculator: React.FC<CommercialQuoteCalculatorProps>
   };
 
   return (
-    <section id="estimator" className="py-14 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto relative z-10 scroll-mt-20">
+    <section id="estimator" className="py-8 sm:py-14 px-3 sm:px-6 lg:px-8 max-w-7xl mx-auto relative z-10 scroll-mt-20">
       
       {/* Active Lead Context Banner (When estimating for an internal opportunity) */}
       {activeLead && (
-        <div className="mb-8 p-4 rounded-2xl bg-blue-950/80 border border-blue-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-lg">
+        <div className="mb-6 sm:mb-8 p-3.5 sm:p-4 rounded-2xl bg-blue-950/80 border border-blue-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-lg">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-blue-600/30 border border-blue-500/40 flex items-center justify-center text-blue-400 font-bold">
+            <div className="w-9 h-9 rounded-xl bg-blue-600/30 border border-blue-500/40 flex items-center justify-center text-blue-400 font-bold shrink-0">
               <Building2 className="w-5 h-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs font-mono font-bold text-blue-400">{activeLead.leadId}</span>
                 <span className="text-sm font-bold text-white">{activeLead.companyName}</span>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-900 text-blue-200 border border-blue-700">
                   {activeLead.status}
                 </span>
               </div>
-              <p className="text-xs text-slate-500">
-                Contact: <strong className="text-slate-800">{activeLead.contactPerson || activeLead.fullName || 'Unassigned'}</strong> • {activeLead.projectLocation || activeLead.propertyAddress || brandConfig.primaryCity}
+              <p className="text-xs text-blue-300 mt-0.5">
+                Modifying parameters updates this lead's estimate snapshot and proposal scope.
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="text-right hidden sm:block">
-              <span className="text-xs text-slate-400 block">Current Saved Rate:</span>
-              <span className="font-mono font-bold text-emerald-400 text-sm">
-                {formatCurrency(activeLead.monthlyEstimate || Math.round((activeLead.estimatedValue || 0) / 12))}/mo
-              </span>
-            </div>
+          <div className="flex items-center gap-2">
             {onClearActiveLead && (
               <button
                 type="button"
-                onClick={() => {
-                  setDiscretionaryAdjustment(0);
-                  onClearActiveLead();
-                }}
-                className="text-xs font-semibold px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 shadow-sm"
-                title="Disconnect current lead and start a new blank estimate for another company"
+                onClick={onClearActiveLead}
+                className="w-full sm:w-auto text-xs text-blue-300 hover:text-white px-3 py-1.5 rounded-lg border border-blue-800 hover:border-blue-600 transition-colors cursor-pointer flex items-center justify-center gap-1.5 min-h-[36px]"
               >
                 <X className="w-3.5 h-3.5 text-slate-400" />
                 <span>New Blank Estimate</span>
@@ -205,7 +196,7 @@ export const CommercialQuoteCalculator: React.FC<CommercialQuoteCalculatorProps>
       )}
 
       {/* Section Header */}
-      <div className="text-center max-w-3xl mx-auto mb-12">
+      <div className="text-center max-w-3xl mx-auto mb-8 sm:mb-12">
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold tracking-wide uppercase mb-3.5 shadow-sm">
           <Sliders className="w-3.5 h-3.5" />
           <span>Transparent B2B Bidding Engine</span>
@@ -213,15 +204,32 @@ export const CommercialQuoteCalculator: React.FC<CommercialQuoteCalculatorProps>
         <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight">
           Instant Commercial Janitorial Rate Calculator
         </h2>
-        <p className="mt-3 text-sm sm:text-base text-slate-600">
+        <p className="mt-2 sm:mt-3 text-xs sm:text-base text-slate-600">
           Get an itemized ballpark monthly estimate for your facility in {brandConfig.primaryCity} based on cleanable square footage, ISSA production standards, and sanitization protocols.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      {/* Desktop Advisory Banner for Mobile Viewports (Requirement 6) */}
+      <div className="block lg:hidden mb-6 bg-gradient-to-r from-blue-50 via-white to-indigo-50 border border-blue-200 rounded-2xl p-4 text-xs shadow-xs text-slate-800">
+        <div className="flex items-start gap-3">
+          <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+            <Monitor className="w-4 h-4" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-extrabold text-slate-900 text-sm">
+              Best experienced on desktop or laptop.
+            </div>
+            <p className="text-slate-600 text-xs mt-0.5 leading-relaxed">
+              The estimating workspace is optimized for larger screens. All calculations and controls below remain accessible on mobile.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
         
         {/* Left Column: Interactive Input Controls (7 cols) */}
-        <div className="lg:col-span-7 space-y-8 clean-card rounded-2xl p-6 sm:p-8 shadow-sm">
+        <div className="lg:col-span-7 space-y-6 sm:space-y-8 clean-card rounded-2xl p-4 sm:p-8 shadow-sm">
           
           {/* 1. Square Footage Slider & Stepper */}
           <div>
@@ -232,7 +240,7 @@ export const CommercialQuoteCalculator: React.FC<CommercialQuoteCalculatorProps>
                   (ISSA 540 Standards)
                 </span>
               </label>
-              <div className="flex items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5">
                 <span className="text-xs text-slate-500 font-medium">Quick Select:</span>
                 {[5000, 15000, 30000, 60000].map((size) => (
                   <button
@@ -251,7 +259,7 @@ export const CommercialQuoteCalculator: React.FC<CommercialQuoteCalculatorProps>
               </div>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4">
               <input
                 type="range"
                 min="1000"
@@ -261,16 +269,16 @@ export const CommercialQuoteCalculator: React.FC<CommercialQuoteCalculatorProps>
                 onChange={(e) => setSquareFootage(Number(e.target.value))}
                 className="w-full h-2.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
               />
-              <div className="flex items-center gap-1 min-w-[140px] px-3 py-1.5 rounded-xl border border-slate-300 bg-white shadow-inner">
+              <div className="flex items-center justify-between sm:justify-end gap-1 w-full sm:w-auto sm:min-w-[140px] px-3 py-2 sm:py-1.5 rounded-xl border border-slate-300 bg-white shadow-inner">
                 <input
                   type="number"
                   min="1"
                   step="any"
                   value={squareFootage}
                   onChange={(e) => setSquareFootage(Math.max(0, Number(e.target.value)))}
-                  className="w-full font-mono text-sm font-bold text-slate-900 text-right focus:outline-none"
+                  className="w-full font-mono text-base sm:text-sm font-bold text-slate-900 text-right focus:outline-none"
                 />
-                <span className="text-xs font-medium text-slate-500">sq ft</span>
+                <span className="text-xs font-medium text-slate-500 shrink-0">sq ft</span>
               </div>
             </div>
           </div>
@@ -390,7 +398,7 @@ export const CommercialQuoteCalculator: React.FC<CommercialQuoteCalculatorProps>
         {/* Right Column: Live Estimate Breakdown & CTAs (5 cols) */}
         <div className="lg:col-span-5 space-y-5 lg:sticky lg:top-24">
           
-          <div className="rounded-2xl p-6 sm:p-7 bg-slate-900 border border-slate-800 text-white shadow-xl relative overflow-hidden">
+          <div className="rounded-2xl p-4 sm:p-7 bg-slate-900 border border-slate-800 text-white shadow-xl relative overflow-hidden">
             
             {/* Soft backdrop glow */}
             <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/10 rounded-full blur-2xl pointer-events-none"></div>

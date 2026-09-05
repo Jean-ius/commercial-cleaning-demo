@@ -237,36 +237,37 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm overflow-y-auto">
-      <div className="relative w-full max-w-2xl bg-white border border-slate-200 rounded-2xl shadow-2xl shadow-slate-900/20 overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/50 backdrop-blur-sm overflow-y-auto">
+      <div className="relative w-full max-w-2xl bg-white border border-slate-200 rounded-2xl shadow-2xl shadow-slate-900/20 my-auto sm:my-8 animate-in fade-in zoom-in-95 duration-200 max-h-[94vh] flex flex-col overflow-hidden">
         
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 bg-slate-50 border-b border-slate-200">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 font-bold">
-              <Sparkles className="w-5 h-5" />
+        {/* Header (Fixed at top) */}
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 bg-slate-50 border-b border-slate-200 shrink-0">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 font-bold shrink-0">
+              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-slate-900 tracking-tight">Create New Lead</h2>
-                <span className="font-mono text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">
+                <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">Create New Lead</h2>
+                <span className="font-mono text-[11px] sm:text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">
                   {leadId}
                 </span>
               </div>
-              <p className="text-xs text-slate-500">Add a new prospect to your sales pipeline and Google Sheets database</p>
+              <p className="text-[11px] sm:text-xs text-slate-500">Add a new prospect to your sales pipeline and Google Sheets</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+            className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer min-h-[40px] min-w-[40px] flex items-center justify-center"
+            aria-label="Close modal"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        {/* Scrollable Form Body */}
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto flex-1 mobile-scroll-container">
           {errorMsg && (
             <div className="flex items-center gap-2 p-3 text-xs text-rose-800 bg-rose-50 border border-rose-200 rounded-xl">
               <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
@@ -276,21 +277,21 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
 
           {/* Section 1: Prospect & Company */}
           <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700 block mb-3">
-              1. Prospect & Company (Required)
+            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700 block mb-2.5">
+              1. Prospect &amp; Company (Required)
             </span>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Company Name *</label>
                 <div className="relative">
-                  <Building2 className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                  <Building2 className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
                   <input
                     type="text"
                     required
                     placeholder="e.g. Apex Health Center"
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 shadow-sm"
+                    className="w-full pl-9 pr-3 py-2.5 sm:py-2 text-base sm:text-sm bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 shadow-sm min-h-[44px]"
                   />
                 </div>
               </div>
@@ -298,13 +299,13 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Contact Person *</label>
                 <div className="relative">
-                  <User className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                  <User className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
                   <input
                     type="text"
                     placeholder="e.g. Sarah Jenkins"
                     value={contactPerson}
                     onChange={(e) => setContactPerson(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 shadow-sm"
+                    className="w-full pl-9 pr-3 py-2.5 sm:py-2 text-base sm:text-sm bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 shadow-sm min-h-[44px]"
                   />
                 </div>
               </div>
@@ -312,13 +313,13 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Email</label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                  <Mail className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
                   <input
                     type="email"
                     placeholder="contact@company.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm"
+                    className="w-full pl-9 pr-3 py-2.5 sm:py-2 text-base sm:text-sm bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm min-h-[44px]"
                   />
                 </div>
               </div>
@@ -326,13 +327,13 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Phone</label>
                 <div className="relative">
-                  <Phone className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                  <Phone className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
                   <input
                     type="tel"
                     placeholder="(555) 000-0000"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm"
+                    className="w-full pl-9 pr-3 py-2.5 sm:py-2 text-base sm:text-sm bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm min-h-[44px]"
                   />
                 </div>
               </div>
@@ -341,20 +342,20 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
 
           {/* Section 2: Project Scope & Location */}
           <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700 block mb-3">
-              2. Project Scope & Location
+            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700 block mb-2.5">
+              2. Project Scope &amp; Location
             </span>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Project Name</label>
                 <div className="relative">
-                  <Briefcase className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                  <Briefcase className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
                   <input
                     type="text"
                     placeholder="e.g. Headquarters Facility Janitorial"
                     value={projectName}
                     onChange={(e) => setProjectName(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm"
+                    className="w-full pl-9 pr-3 py-2.5 sm:py-2 text-base sm:text-sm bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm min-h-[44px]"
                   />
                 </div>
               </div>
@@ -366,7 +367,7 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
                   placeholder="e.g. Commercial Office, Medical Facility..."
                   value={projectType}
                   onChange={(e) => setProjectType(e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 shadow-sm"
+                  className="w-full px-3 py-2.5 sm:py-2 text-base sm:text-sm bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 shadow-sm min-h-[44px]"
                 />
               </div>
             </div>
@@ -374,13 +375,13 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
             <div className="mt-3">
               <label className="block text-xs font-semibold text-slate-700 mb-1">Project Location / Property Address</label>
               <div className="relative">
-                <MapPin className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                <MapPin className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
                 <input
                   type="text"
                   placeholder="e.g. 100 Technology Blvd, Suite 200, Dallas, TX"
                   value={projectLocation}
                   onChange={(e) => setProjectLocation(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm"
+                  className="w-full pl-9 pr-3 py-2.5 sm:py-2 text-base sm:text-sm bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm min-h-[44px]"
                 />
               </div>
             </div>
@@ -388,16 +389,16 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
 
           {/* Section 3: Status, Estimated Value, and Lead Source */}
           <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700 block mb-3">
-              3. Status, Value & Source
+            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700 block mb-2.5">
+              3. Status, Value &amp; Source
             </span>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Lead Status</label>
                 <select
                   value={status}
                   onChange={(e) => setStatus(e.target.value as LeadStatus)}
-                  className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 shadow-sm font-semibold"
+                  className="w-full px-3 py-2.5 sm:py-2 text-base sm:text-sm bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 shadow-sm font-semibold min-h-[44px]"
                 >
                   {LEAD_STATUS_OPTIONS.map((st) => (
                     <option key={st} value={st}>
@@ -410,14 +411,15 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Estimated Value ($)</label>
                 <div className="relative">
-                  <DollarSign className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                  <DollarSign className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
                   <input
                     type="number"
                     min="0"
                     step="any"
+                    placeholder="e.g. 35000"
                     value={estimatedValue}
                     onChange={(e) => setEstimatedValue(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 shadow-sm font-mono"
+                    className="w-full pl-9 pr-3 py-2.5 sm:py-2 text-base sm:text-sm bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 shadow-sm font-mono min-h-[44px]"
                   />
                 </div>
               </div>
@@ -427,7 +429,7 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
                 <select
                   value={leadSource}
                   onChange={(e) => setLeadSource(e.target.value as LeadSource)}
-                  className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 shadow-sm"
+                  className="w-full px-3 py-2.5 sm:py-2 text-base sm:text-sm bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 shadow-sm min-h-[44px]"
                 >
                   {LEAD_SOURCE_OPTIONS.map((src) => (
                     <option key={src} value={src}>
@@ -438,25 +440,25 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Assigned Sales Rep</label>
                 <input
                   type="text"
-                  placeholder="e.g. Marcus Vance / CleanCommand Sales"
+                  placeholder="e.g. Marcus Vance / Sales Team"
                   value={assignedSalesRep}
                   onChange={(e) => setAssignedSalesRep(e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 shadow-sm"
+                  className="w-full px-3 py-2.5 sm:py-2 text-base sm:text-sm bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 shadow-sm min-h-[44px]"
                 />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Special Requirements</label>
                 <input
                   type="text"
-                  placeholder="e.g. HEPA filtration, biohazard protocol, after-hours key access..."
+                  placeholder="e.g. HEPA filtration, after-hours key access..."
                   value={specialRequirements}
                   onChange={(e) => setSpecialRequirements(e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 shadow-sm"
+                  className="w-full px-3 py-2.5 sm:py-2 text-base sm:text-sm bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 shadow-sm min-h-[44px]"
                 />
               </div>
             </div>
@@ -468,7 +470,7 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
                 placeholder="Initial conversation notes, client preferences..."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 resize-none shadow-sm"
+                className="w-full px-3 py-2.5 sm:py-2 text-base sm:text-sm bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 resize-none shadow-sm"
               />
             </div>
           </div>
@@ -478,13 +480,13 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 block">
               Estimator Pre-Configuration (Optional)
             </span>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-[11px] font-medium text-slate-600 mb-1">Facility Sector</label>
                 <select
                   value={facilityType}
                   onChange={(e) => setFacilityType(e.target.value as FacilitySectorId)}
-                  className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-blue-600"
+                  className="w-full px-2.5 py-2 text-base sm:text-xs bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-blue-600 min-h-[42px]"
                 >
                   {facilitySectors.map((sector) => (
                     <option key={sector.id} value={sector.id}>
@@ -503,7 +505,7 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
                   placeholder="e.g. 15000"
                   value={squareFootage}
                   onChange={(e) => setSquareFootage(e.target.value)}
-                  className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-blue-600 font-mono"
+                  className="w-full px-2.5 py-2 text-base sm:text-xs bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-blue-600 font-mono min-h-[42px]"
                 />
               </div>
 
@@ -512,7 +514,7 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
                 <select
                   value={cleaningFrequency}
                   onChange={(e) => setCleaningFrequency(e.target.value as FrequencyId)}
-                  className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-blue-600"
+                  className="w-full px-2.5 py-2 text-base sm:text-xs bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-blue-600 min-h-[42px]"
                 >
                   {frequencyOptions.map((freq) => (
                     <option key={freq.id} value={freq.id}>
@@ -524,19 +526,19 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
             </div>
           </div>
 
-          {/* Footer Actions */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
+          {/* Footer Actions (Sticky bottom bar) */}
+          <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2.5 sm:gap-3 pt-3 border-t border-slate-200">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
+              className="w-full sm:w-auto px-4 py-2.5 text-sm font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer min-h-[44px] flex items-center justify-center"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl shadow-sm transition-all flex items-center gap-2 cursor-pointer"
+              className="w-full sm:w-auto px-6 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer min-h-[44px]"
             >
               {isSubmitting ? (
                 <>

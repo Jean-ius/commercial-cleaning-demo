@@ -38,29 +38,29 @@ export const SalesPipelineBar: React.FC<SalesPipelineBarProps> = ({
   }, {} as Record<LeadStatus, number>);
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-6 shadow-sm">
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-3">
-        <div>
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+    <div className="bg-white border border-slate-200 rounded-2xl p-3.5 sm:p-4 mb-4 sm:mb-6 shadow-sm">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2 sm:gap-3 mb-3">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider">
             Sales Pipeline Progression
           </span>
           {activeLead && (
-            <span className="ml-2 text-xs text-blue-700 font-semibold">
+            <span className="text-xs text-blue-700 font-semibold truncate max-w-[240px] sm:max-w-none">
               (Active: {activeLead.companyName} • {activeLead.leadId})
             </span>
           )}
         </div>
         {activeLead && (
-          <div className="flex items-center gap-3 text-xs text-slate-600">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-slate-600">
             <span>
-              Current Stage:{' '}
+              Stage:{' '}
               <span className="font-bold text-blue-700">
                 {activeLead.status}
               </span>
             </span>
-            <span>•</span>
+            <span className="text-slate-300">•</span>
             <span>
-              Estimated Value:{' '}
+              Value:{' '}
               <span className="font-bold text-emerald-700 font-mono">
                 ${(activeLead.estimatedValue || activeLead.annualContractValue || 0).toLocaleString()}
               </span>
@@ -70,7 +70,7 @@ export const SalesPipelineBar: React.FC<SalesPipelineBarProps> = ({
       </div>
 
       {/* Stage Flow Pills */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-1.5 sm:gap-2">
         {PIPELINE_STAGES.map((stage) => {
           const Icon = stage.icon;
           const isCurrent = activeLead?.status === stage.id;
@@ -82,7 +82,7 @@ export const SalesPipelineBar: React.FC<SalesPipelineBarProps> = ({
               type="button"
               onClick={() => onStatusChange(stage.id)}
               disabled={!activeLead}
-              className={`flex items-center justify-between px-3 py-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+              className={`flex items-center justify-between px-2.5 sm:px-3 py-2 sm:py-2.5 rounded-xl border text-[11px] sm:text-xs font-semibold transition-all cursor-pointer min-h-[40px] ${
                 isCurrent
                   ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20 ring-2 ring-blue-500/30'
                   : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200 hover:border-slate-300'
@@ -93,7 +93,7 @@ export const SalesPipelineBar: React.FC<SalesPipelineBarProps> = ({
                 <span className="truncate">{stage.label}</span>
               </div>
               <span
-                className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full ${
+                className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full shrink-0 ml-1 ${
                   isCurrent
                     ? 'bg-blue-700 text-white'
                     : 'bg-slate-200 text-slate-700'

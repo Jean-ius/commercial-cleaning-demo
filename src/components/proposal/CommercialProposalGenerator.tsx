@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  Printer, 
-  ArrowLeft, 
-  Edit3, 
-  Save, 
-  Copy, 
-  Check 
+import {
+  Printer,
+  ArrowLeft,
+  Edit3,
+  Save,
+  Copy,
+  Check
 } from 'lucide-react';
 import { EstimateResult, ClientBrandConfig, ProposalData, LeadRecord, ProposalStatus } from '../../types/cleanCommand';
 import { facilitySectors, frequencyOptions, addOnServices } from '../../config/clientConfig';
@@ -135,11 +135,11 @@ Guaranteed SLA: ${brandConfig.qualitySla || '4-Hour Prompt Re-Clean Guarantee'}`
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 py-6 px-4 sm:px-6 lg:px-8 text-slate-900 selection:bg-blue-600 selection:text-white print:bg-white print:p-0 print:m-0 print:min-h-0">
-      
+    <div className="min-h-screen bg-slate-100 py-4 sm:py-6 px-2.5 sm:px-6 lg:px-8 text-slate-900 selection:bg-blue-600 selection:text-white print:bg-white print:p-0 print:m-0 print:min-h-0">
+
       {/* Validation Prompt Banner if any required proposal fields are missing */}
       {missingFields.length > 0 && (
-        <div className="max-w-[794px] mx-auto mb-4 p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs shadow-sm flex items-start gap-3 print:hidden">
+        <div className="max-w-[794px] mx-auto mb-3 sm:mb-4 p-3.5 sm:p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs shadow-sm flex items-start gap-3 print:hidden">
           <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
           <div className="flex-1">
             <h4 className="font-bold text-amber-950">Proposal Validation: Required Information Missing</h4>
@@ -154,67 +154,68 @@ Guaranteed SLA: ${brandConfig.qualitySla || '4-Hour Prompt Re-Clean Guarantee'}`
               ))}
             </div>
             <p className="mt-2 text-[11px] text-amber-700">
-              Click <strong>Edit Document</strong> below to complete client details directly on this proposal.
+              Click <strong>Edit Info</strong> below to complete client details directly on this proposal.
             </p>
           </div>
         </div>
       )}
 
       {/* Top Action Toolbar (Hidden on Print) */}
-      <div className="max-w-[794px] mx-auto mb-4 flex flex-wrap items-center justify-between gap-3 bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm print:hidden">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-800 transition-colors cursor-pointer"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Back to Estimator</span>
-        </button>
-
-        {/* Live Discretionary Adjustment Slider in Proposal Studio Toolbar (Requirement 3) */}
-        <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
-          <span className="text-[11px] font-bold text-slate-700 whitespace-nowrap flex items-center gap-1">
-            <span>Price Adj:</span>
-          </span>
-          <input
-            id="proposal-adjustment-slider"
-            type="range"
-            min="-20"
-            max="20"
-            step="0.5"
-            value={localAdjustment}
-            onChange={(e) => {
-              const raw = parseFloat(e.target.value);
-              const clean = Number.isFinite(raw) ? Math.min(20, Math.max(-20, raw)) : 0;
-              handleSliderChange(clean);
-            }}
-            className="w-24 sm:w-28 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-            title="Adjust final proposed price live on proposal document"
-          />
-          <span 
-            className={`text-[11px] font-mono font-bold px-1.5 py-0.5 rounded ${
-              localAdjustment > 0 
-                ? 'bg-emerald-100 text-emerald-800' 
-                : localAdjustment < 0 
-                  ? 'bg-amber-100 text-amber-800' 
-                  : 'bg-slate-200 text-slate-700'
-            }`}
+      <div className="max-w-[794px] mx-auto mb-3 sm:mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white border border-slate-200 rounded-2xl p-3 sm:p-3.5 shadow-sm print:hidden">
+        <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-800 transition-colors cursor-pointer min-h-[38px]"
           >
-            {localAdjustment > 0 ? '+' : ''}{localAdjustment.toFixed(1)}%
-          </span>
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back</span>
+          </button>
+
+          {/* Live Discretionary Adjustment Slider in Proposal Studio Toolbar */}
+          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-2.5 sm:px-3 py-1.5 rounded-xl">
+            <span className="text-[11px] font-bold text-slate-700 whitespace-nowrap flex items-center gap-1">
+              <span>Adj:</span>
+            </span>
+            <input
+              id="proposal-adjustment-slider"
+              type="range"
+              min="-20"
+              max="20"
+              step="0.5"
+              value={localAdjustment}
+              onChange={(e) => {
+                const raw = parseFloat(e.target.value);
+                const clean = Number.isFinite(raw) ? Math.min(20, Math.max(-20, raw)) : 0;
+                handleSliderChange(clean);
+              }}
+              className="w-20 sm:w-28 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+              title="Adjust final proposed price live on proposal document"
+            />
+            <span
+              className={`text-[11px] font-mono font-bold px-1.5 py-0.5 rounded ${localAdjustment > 0
+                  ? 'bg-emerald-100 text-emerald-800'
+                  : localAdjustment < 0
+                    ? 'bg-amber-100 text-amber-800'
+                    : 'bg-slate-200 text-slate-700'
+                }`}
+            >
+              {localAdjustment > 0 ? '+' : ''}{localAdjustment.toFixed(1)}%
+            </span>
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <button
             onClick={handleCopyEmailSummary}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-800 transition-colors cursor-pointer"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-800 transition-colors cursor-pointer min-h-[38px]"
           >
             {copiedSummary ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-slate-600" />}
-            <span>{copiedSummary ? 'Copied!' : 'Copy Summary'}</span>
+            <span>{copiedSummary ? 'Copied' : 'Copy Summary'}</span>
           </button>
 
           <button
             onClick={() => setIsEditing(!isEditing)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-800 transition-colors cursor-pointer"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-800 transition-colors cursor-pointer min-h-[38px]"
           >
             {isEditing ? <Save className="w-4 h-4 text-emerald-600" /> : <Edit3 className="w-4 h-4 text-blue-600" />}
             <span>{isEditing ? 'Done' : 'Edit Info'}</span>
@@ -223,12 +224,19 @@ Guaranteed SLA: ${brandConfig.qualitySla || '4-Hour Prompt Re-Clean Guarantee'}`
           {/* UNIFIED NATIVE PRINT & SAVE AS PDF BUTTON */}
           <button
             onClick={handlePrint}
-            className="flex items-center gap-2 px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black shadow-md shadow-blue-600/25 transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black shadow-md shadow-blue-600/25 transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98] min-h-[40px]"
           >
             <Printer className="w-4 h-4" />
             <span>Print / Save as PDF</span>
           </button>
         </div>
+      </div>
+
+      {/* Mobile Screen Document Preview Guidance Notice */}
+      <div className="max-w-[794px] mx-auto mb-2.5 text-center block md:hidden print:hidden">
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-200/90 text-slate-700 text-[11px] font-medium shadow-2xs">
+          <span>📄 Swipe horizontally to view full print-ready A4 document</span>
+        </span>
       </div>
 
       {/* 
@@ -238,22 +246,23 @@ Guaranteed SLA: ${brandConfig.qualitySla || '4-Hour Prompt Re-Clean Guarantee'}`
         CONTENT → INVESTMENT → COMMITMENTS → SIGNATURES → FOOTER → BOTTOM WHITESPACE.
         ==================================================================
       */}
-      <div 
-        id="official-proposal-sheet"
-        className="mx-auto bg-white text-slate-900 shadow-2xl rounded-xl border border-slate-200 p-8 sm:p-10 text-xs leading-normal space-y-4"
-        style={{ 
-          width: '794px', 
-          minHeight: '1123px',
-          boxSizing: 'border-box',
-          fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-        }}
-      >
-        
+      <div className="w-full overflow-x-auto pb-8 print:overflow-visible print:pb-0 mobile-scroll-container">
+        <div
+          id="official-proposal-sheet"
+          className="mx-auto bg-white text-slate-900 shadow-2xl rounded-xl border border-slate-200 p-8 sm:p-10 text-xs leading-normal space-y-4"
+          style={{
+            width: '794px',
+            minHeight: '1123px',
+            boxSizing: 'border-box',
+            fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+          }}
+        >
+
         {/* 1. Header: Elegant Corporate Letterhead */}
         <div className="flex items-start justify-between border-b-2 border-slate-900 pb-3.5">
           {/* Company Info */}
           <div className="flex items-start gap-3">
-            <div 
+            <div
               className="w-11 h-11 rounded-lg text-white flex items-center justify-center font-black text-xl shadow-xs shrink-0 mt-0.5"
               style={{ backgroundColor: brandConfig.primaryAccentColor || '#2563EB' }}
             >
@@ -500,9 +509,9 @@ Guaranteed SLA: ${brandConfig.qualitySla || '4-Hour Prompt Re-Clean Guarantee'}`
           Follows Service Commitments immediately and naturally (NO large spacer).
         */}
         <div className="pt-3.5 border-t-2 border-slate-900 text-xs" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
-          
+
           <div className="grid grid-cols-2 gap-8">
-            
+
             {/* Service Provider Signature Column */}
             <div className="space-y-2">
               <span className="text-[10px] uppercase font-black text-slate-700 tracking-wider block">
@@ -585,6 +594,8 @@ Guaranteed SLA: ${brandConfig.qualitySla || '4-Hour Prompt Re-Clean Guarantee'}`
         </div>
 
       </div>
+
+    </div>
 
     </div>
   );
